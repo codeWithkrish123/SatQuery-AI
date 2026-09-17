@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Production Build Output
+dist/
+
+# Environment Files & Secrets (NEVER COMMIT THIS)
+.env
+.env.local
+.env.development
+.env.production
+*.env
+
+# Uploaded Files & Temporary Storage
+uploads/
+tmp/
+scratch/
+
+# Database & Logs
+*.log
+prisma/dev.db
+prisma/dev.db-journal
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+.vscode/

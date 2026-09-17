@@ -1,0 +1,87 @@
+// Prisma schema file for PostgreSQL database
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SystemStatus {
+  id                 Int      @id @default(autoincrement())
+  status             String   @default("BACKEND NOMINAL")
+  node               String   @default("A7")
+  activeSatellites   Int      @default(12)
+  coveragePercentage Int      @default(74)
+  evidenceCoverage   Float    @default(98.4)
+  medianResponse     String   @default("4.6s")
+  updatedAt          DateTime @updatedAt
+}
+
+model Scene {
+  id          String   @id
+  name        String
+  satellite   String
+  type        String
+  category    String
+  acquired    String
+  confidence  Float
+  status      String   @default("ANALYZED")
+  resolution  String
+  coordinates String
+  thumbnail   String
+  createdAt   DateTime @default(now())
+}
+
+model QueryArchive {
+  id         String   @id
+  query      String
+  scene      String
+  location   String
+  satellite  String
+  acquired   String
+  confidence Float
+  mode       String
+  status     String   @default("Completed")
+  createdAt  DateTime @default(now())
+}
+
+model TemporalReport {
+  id               Int      @id @default(autoincrement())
+  title            String
+  period           String
+  expansionHa      Float
+  percentageGrowth String
+  timeline         Json
+  highlights       Json
+  createdAt        DateTime @default(now())
+}
+
+model SatelliteCatalog {
+  id                 String   @id
+  satellite_name     String   @unique
+  operator           String
+  mission            String
+  sensor             String
+  orbit              String
+  spatial_resolution String
+  temporal_resolution String
+  spectral_bands     String[]
+  launch_date        String
+  status             String
+  source_name        String
+  source_url         String
+  createdAt          DateTime @default(now())
+}
+
+model EvidenceDocument {
+  source_id   String   @id
+  title       String
+  content     String
+  url         String
+  source_type String
+  score       Float    @default(0.9)
+  createdAt   DateTime @default(now())
+}

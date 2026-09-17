@@ -1,0 +1,157 @@
+{
+  "system": {
+    "status": "BACKEND NOMINAL",
+    "node": "A7",
+    "activeSatellites": 12,
+    "coveragePercentage": 74,
+    "evidenceCoverage": 98.4,
+    "medianResponse": "4.6s",
+    "lastSync": "LIVE UTC"
+  },
+  "scenes": [
+    {
+      "id": "SCN-2026-0891",
+      "name": "Nubra Valley glacial runoff",
+      "satellite": "LISS-IV / EOS-04",
+      "type": "LISS-IV",
+      "category": "Optical",
+      "acquired": "14 SEP 2026",
+      "confidence": 99.1,
+      "status": "ANALYZED",
+      "resolution": "5.8m",
+      "coordinates": "34.6863° N, 77.5673° E",
+      "thumbnail": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "SCN-2026-0890",
+      "name": "Brahmaputra floodplain inundation",
+      "satellite": "Cartosat-3 / RISAT-1A",
+      "type": "Cartosat",
+      "category": "Optical",
+      "acquired": "12 SEP 2026",
+      "confidence": 98.4,
+      "status": "ANALYZED",
+      "resolution": "0.25m",
+      "coordinates": "26.1445° N, 91.7362° E",
+      "thumbnail": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "SCN-2026-0889",
+      "name": "Kutch coastal corridor tidal shift",
+      "satellite": "Sentinel-1 / RISAT-1",
+      "type": "SAR",
+      "category": "SAR",
+      "acquired": "09 SEP 2026",
+      "confidence": 97.6,
+      "status": "ANALYZED",
+      "resolution": "10m",
+      "coordinates": "23.7337° N, 69.8597° E",
+      "thumbnail": "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "SCN-2026-0888",
+      "name": "Sunderbans mangrove canopy density",
+      "satellite": "EOS-06 / Oceansat-3",
+      "type": "Optical",
+      "category": "Optical",
+      "acquired": "06 SEP 2026",
+      "confidence": 96.9,
+      "status": "ANALYZED",
+      "resolution": "360m",
+      "coordinates": "21.9497° N, 89.1833° E",
+      "thumbnail": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "SCN-2026-0887",
+      "name": "Western Ghats forest canopy loss",
+      "satellite": "LISS-IV / Cartosat-2",
+      "type": "LISS-IV",
+      "category": "Optical",
+      "acquired": "02 SEP 2026",
+      "confidence": 98.8,
+      "status": "ANALYZED",
+      "resolution": "2.5m",
+      "coordinates": "10.8505° N, 76.2711° E",
+      "thumbnail": "https://images.unsplash.com/photo-1511497584788-876761c11969?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "SCN-2026-0886",
+      "name": "Thar desert solar park expansion",
+      "satellite": "Sentinel-2 / Cartosat-3",
+      "type": "Cartosat",
+      "category": "Optical",
+      "acquired": "28 AUG 2026",
+      "confidence": 99.4,
+      "status": "ANALYZED",
+      "resolution": "0.25m",
+      "coordinates": "27.0238° N, 71.9165° E",
+      "thumbnail": "https://images.unsplash.com/photo-1509391365360-2e959784a276?w=600&auto=format&fit=crop&q=60"
+    }
+  ],
+  "reports": {
+    "title": "WATER EXTENT / LAST 30 DAYS",
+    "period": "14 AUG 2026 - 12 SEP 2026",
+    "expansionHa": 18.6,
+    "percentageGrowth": "+14.2%",
+    "timeline": [
+      { "date": "14 AUG", "extent": 124.2, "baseline": 120.0 },
+      { "date": "19 AUG", "extent": 128.5, "baseline": 120.0 },
+      { "date": "24 AUG", "extent": 133.1, "baseline": 120.0 },
+      { "date": "29 AUG", "extent": 137.8, "baseline": 120.0 },
+      { "date": "03 SEP", "extent": 140.2, "baseline": 120.0 },
+      { "date": "08 SEP", "extent": 141.5, "baseline": 120.0 },
+      { "date": "12 SEP", "extent": 142.8, "baseline": 120.0 }
+    ],
+    "highlights": [
+      "Monsoon surge expanded river shoreline by 18.6 hectares across Eastern basin.",
+      "Sentinel-1 SAR C-band radar confirmed 0% cloud occlusion interference.",
+      "Bi-temporal change detection verified chronology integrity without hallucination."
+    ]
+  },
+  "archive": [
+    {
+      "id": "QRY-9812",
+      "query": "Quantify shoreline shift in Brahmaputra lower bank",
+      "scene": "Brahmaputra floodplain inundation",
+      "location": "Assam, India (26.14° N, 91.73° E)",
+      "satellite": "Cartosat-3 / RISAT-1A",
+      "acquired": "12 SEP 2026",
+      "confidence": 98.4,
+      "mode": "Change Detection",
+      "status": "Completed"
+    },
+    {
+      "id": "QRY-9811",
+      "query": "Detect and ground solar panel arrays in Thar quadrant",
+      "scene": "Thar desert solar park expansion",
+      "location": "Rajasthan, India (27.02° N, 71.91° E)",
+      "satellite": "Cartosat-3",
+      "acquired": "28 AUG 2026",
+      "confidence": 99.4,
+      "mode": "Grounding",
+      "status": "Completed"
+    },
+    {
+      "id": "QRY-9810",
+      "query": "Optical-SAR cross-modal fusion for cloud-covered coastal zone",
+      "scene": "Kutch coastal corridor tidal shift",
+      "location": "Gujarat, India (23.73° N, 69.85° E)",
+      "satellite": "Sentinel-1 / RISAT-1",
+      "acquired": "09 SEP 2026",
+      "confidence": 97.6,
+      "mode": "Optical-SAR Fusion",
+      "status": "Completed"
+    },
+    {
+      "id": "QRY-9809",
+      "query": "Identify glacial lake outburst hazard boundaries",
+      "scene": "Nubra Valley glacial runoff",
+      "location": "Ladakh, India (34.68° N, 77.56° E)",
+      "satellite": "LISS-IV",
+      "acquired": "14 SEP 2026",
+      "confidence": 99.1,
+      "mode": "Visual Q&A",
+      "status": "Completed"
+    }
+  ]
+}

@@ -6,7 +6,6 @@ export interface IEvidenceChunk {
   score: number;
   source_type: 'official_documentation' | 'scientific_dataset' | 'verified_catalog';
 }
-
 const TRUSTED_EVIDENCE_STORE: IEvidenceChunk[] = [
   {
     source_id: 'ISRO-DOC-CARTOSAT3',
@@ -59,20 +58,28 @@ export class RAGEngine {
       let matchCount = 0;
       const docLower = (doc.title + ' ' + doc.content).toLowerCase();
 
-      // Check key keyword overlaps
-      if (q.includes('cartosat') && docLower.includes('cartosat')) matchCount += 3;
-      if ((q.includes('liss') || q.includes('eos-04')) && docLower.includes('liss')) matchCount += 3;
-      if (q.includes('sentinel-1') && docLower.includes('sentinel-1')) matchCount += 3;
-      if (q.includes('sentinel-2') && docLower.includes('sentinel-2')) matchCount += 3;
-      if (q.includes('landsat') && docLower.includes('landsat')) matchCount += 3;
-      if (q.includes('resolution') && docLower.includes('resolution')) matchCount += 1;
-      if (q.includes('band') || q.includes('spectral')) matchCount += 1;
-      if (q.includes('water') || q.includes('flood') || q.includes('delta') || q.includes('crop')) matchCount += 1;
+      // Require explicit mission identifier or technical spec query matches
+      const mentionsCartosat = (q.includes('cartosat') || q.includes('carto')) && docLower.includes('cartosat');
+      const mentionsLiss = (q.includes('liss') || q.includes('eos-04') || q.includes('eos04')) && docLower.includes('liss');
+      const mentionsSentinel1 = (q.includes('sentinel-1') || q.includes('sentinel 1') || q.includes('sar')) && docLower.includes('sentinel-1');
+      const mentionsSentinel2 = (q.includes('sentinel-2') || q.includes('sentinel 2') || q.includes('msi')) && docLower.includes('sentinel-2');
+      const mentionsLandsat = (q.includes('landsat') || q.includes('oli') || q.includes('tirs')) && docLower.includes('landsat');
 
-      if (matchCount > 0) {
+      if (mentionsCartosat) matchCount += 4;
+      if (mentionsLiss) matchCount += 4;
+      if (mentionsSentinel1) matchCount += 4;
+      if (mentionsSentinel2) matchCount += 4;
+      if (mentionsLandsat) matchCount += 4;
+
+      // Allow technical index queries if explicitly requested
+      if ((q.includes('ndwi') || q.includes('ndvi')) && docLower.includes('ndwi')) matchCount += 2;
+      if ((q.includes('spatial resolution') || q.includes('swath') || q.includes('revisit')) && docLower.includes('resolution')) matchCount += 2;
+
+      // Only retain evidence chunks with explicit entity/spec match (matchCount >= 2)
+      if (matchCount >= 2) {
         retrieved.push({
           ...doc,
-          score: Math.min(0.98, parseFloat((0.75 + matchCount * 0.07).toFixed(2)))
+          score: Math.min(0.98, parseFloat((0.80 + matchCount * 0.04).toFixed(2)))
         });
       }
     }
@@ -82,3 +89,4 @@ export class RAGEngine {
     return retrieved;
   }
 }
+

@@ -1,0 +1,23 @@
+# Global Node Dependencies
+**/node_modules/
+
+# Production builds
+**/dist/
+**/build/
+
+# Environment Files & Secrets
+**/.env
+**/.env.local
+**/.env.*
+!**/.env.example
+
+# Uploads & Temp files
+**/uploads/
+**/tmp/
+**/64c2a1ff0ae54dfd50608fca09a7d26c
+
+# Logs & OS files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/

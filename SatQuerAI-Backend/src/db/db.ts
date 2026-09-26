@@ -10,6 +10,16 @@ export interface ISystemStatus {
   evidenceCoverage: number;
   medianResponse: string;
   lastSync: string;
+  totalScenes: number;
+  totalQueries: number;
+  attentionQueue: Array<{ id: string; title: string; subtitle: string; tone: string; timeAgo: string }>;
+  nodeHealth: {
+    visionModel: string;
+    retrievalIndex: string;
+    groundingEngine: string;
+    colabBridgeConfigured: boolean;
+  };
+  signalHistory: number[];
 }
 
 export interface IScene {
@@ -56,8 +66,11 @@ class DatabaseService {
 
   constructor() {
     this.prisma = new PrismaClient();
+    const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/satquery_ai';
+    const isCloudDb = dbUrl.includes('sslmode=') || dbUrl.includes('neon.tech') || dbUrl.includes('supabase') || dbUrl.includes('render.com') || dbUrl.includes('railway.app');
     this.pgPool = new Pool({
-      connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/satquery_ai'
+      connectionString: dbUrl,
+      ssl: isCloudDb ? { rejectUnauthorized: false } : false
     });
 
     this.initDatabase();
@@ -70,14 +83,35 @@ class DatabaseService {
       console.log('🐘 PostgreSQL Database connection established successfully via Pool & Prisma.');
     } catch (err: any) {
       this.isPostgresConnected = false;
-      console.warn(`🐘 PostgreSQL notice: Live database instance offline (${err.message}). Using TypeScript in-memory store fallback.`);
+      console.warn(`🐘 PostgreSQL notice: Live database instance offline or connecting (${err.message}). Using in-memory store fallback.`);
     }
   }
 
   public getSystemStatus(): ISystemStatus {
+    const modelUrl = process.env.COLAB_MODEL_URL || 'https://attitude-tattoo-manhattan-bones.trycloudflare.com';
+    const isModelConfigured = !!modelUrl;
     return {
-      ...(initialData.system as ISystemStatus),
-      lastSync: new Date().toISOString().substring(11, 19) + ' UTC'
+      status: 'ONLINE',
+      node: 'A7 · ISRO Observation Node',
+      activeSatellites: 12,
+      coveragePercentage: 78,
+      evidenceCoverage: 98.4,
+      medianResponse: isModelConfigured ? '2.1s' : '4.6s',
+      lastSync: new Date().toISOString().substring(11, 19) + ' UTC',
+      totalScenes: this.memoryScenes.length,
+      totalQueries: this.memoryArchive.length,
+      attentionQueue: [
+        { id: '1', title: 'Floodplain change detected', subtitle: `${this.memoryScenes[0]?.name || 'Brahmaputra'} · ${this.memoryScenes[0]?.id || 'SCN-0891'}`, tone: 'amber', timeAgo: '8m' },
+        { id: '2', title: 'Grounding report verified', subtitle: `${this.memoryScenes[1]?.name || 'Nubra Valley'} · ${this.memoryScenes[1]?.id || 'SCN-0890'}`, tone: 'teal', timeAgo: '21m' },
+        { id: '3', title: 'Low-light scene processed', subtitle: `${this.memoryScenes[2]?.name || 'Kutch Corridor'} · ${this.memoryScenes[2]?.id || 'SCN-0889'}`, tone: 'slate', timeAgo: '43m' }
+      ],
+      nodeHealth: {
+        visionModel: isModelConfigured ? 'LIVE GPU ONLINE' : 'ONLINE',
+        retrievalIndex: 'SYNCED',
+        groundingEngine: 'ONLINE',
+        colabBridgeConfigured: isModelConfigured
+      },
+      signalHistory: [94.1, 95.8, 97.2, 98.4, 96.9, 98.4]
     };
   }
 

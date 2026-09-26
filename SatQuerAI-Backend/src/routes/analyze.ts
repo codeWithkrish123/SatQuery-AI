@@ -2,11 +2,21 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { colabBridge } from '../services/colabBridge';
+import os from 'os';
+import sharp from 'sharp';
+import { colabBridge, ColabUnavailableError } from '../services/colabBridge';
 import { groundingEngine } from '../services/groundingEngine';
 
 const router = Router();
-const upload = multer({ dest: path.join(__dirname, '../../uploads/') });
+const uploadDest = process.env.VERCEL ? os.tmpdir() : path.join(__dirname, '../../uploads/');
+const upload = multer({
+  dest: uploadDest,
+  limits: { fileSize: 50 * 1024 * 1024, files: 3 },
+  fileFilter: (req, file, callback) => {
+    if (file.mimetype.startsWith('image/')) return callback(null, true);
+    return callback(new Error('Only image uploads are supported.'));
+  }
+});
 
 // GET /api/health
 router.get('/health', (req: Request, res: Response) => {
@@ -17,6 +27,92 @@ router.get('/health', (req: Request, res: Response) => {
   });
 });
 
+router.post(
+  '/spectral-indices',
+  upload.fields([{ name: 'red', maxCount: 1 }, { name: 'nir', maxCount: 1 }, { name: 'green', maxCount: 1 }]),
+  async (req: Request, res: Response) => {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const red = files?.red?.[0];
+    const nir = files?.nir?.[0];
+    const green = files?.green?.[0];
+
+    try {
+      if (!red || !nir) {
+        return res.status(400).json({ error: true, message: 'Red and NIR band files are required.' });
+      }
+
+      const readBand = async (file: Express.Multer.File) => {
+        const result = await sharp(file.path).removeAlpha().greyscale().raw({ depth: 'float' }).toBuffer({ resolveWithObject: true });
+        return { values: new Float32Array(result.data.buffer, result.data.byteOffset, result.data.byteLength / 4), width: result.info.width, height: result.info.height };
+      };
+
+      const [redBand, nirBand, greenBand] = await Promise.all([
+        readBand(red),
+        readBand(nir),
+        green ? readBand(green) : Promise.resolve(null),
+      ]);
+
+      const sameShape = (band: typeof redBand | null) => band && band.width === redBand.width && band.height === redBand.height;
+      if (!sameShape(nirBand) || (greenBand && !sameShape(greenBand))) {
+        return res.status(400).json({ error: true, message: 'Red, NIR, and Green bands must have identical dimensions.' });
+      }
+
+      let ndviSum = 0;
+      let ndwiSum = 0;
+      let validPixels = 0;
+      let waterPixels = 0;
+      let floodCandidatePixels = 0;
+
+      for (let index = 0; index < redBand.values.length; index += 1) {
+        const redValue = redBand.values[index];
+        const nirValue = nirBand.values[index];
+        const greenValue = greenBand?.values[index];
+        const ndviDenominator = nirValue + redValue;
+        const ndwiDenominator = greenValue == null ? 0 : greenValue + nirValue;
+
+        if (!Number.isFinite(redValue) || !Number.isFinite(nirValue) || ndviDenominator === 0) continue;
+        const ndvi = (nirValue - redValue) / ndviDenominator;
+        ndviSum += ndvi;
+        validPixels += 1;
+
+        if (greenValue != null && ndwiDenominator !== 0) {
+          const ndwi = (greenValue - nirValue) / ndwiDenominator;
+          ndwiSum += ndwi;
+          if (ndwi > 0.2) {
+            waterPixels += 1;
+            if (ndvi < 0.2) floodCandidatePixels += 1;
+          }
+        }
+      }
+
+      if (validPixels === 0) {
+        return res.status(400).json({ error: true, message: 'The uploaded bands contain no valid pixels.' });
+      }
+
+      const ndwiAvailable = Boolean(greenBand);
+      res.json({
+        answer: ndwiAvailable
+          ? 'NDVI and NDWI were calculated from the uploaded spectral bands. Water and flood percentages are threshold-based candidates, not a confirmed flood map.'
+          : 'NDVI was calculated from the uploaded Red and NIR bands. Upload the Green band to calculate NDWI and water candidates.',
+        ndvi_mean: Number((ndviSum / validPixels).toFixed(4)),
+        ndwi_mean: ndwiAvailable ? Number((ndwiSum / validPixels).toFixed(4)) : null,
+        water_candidate_percent: ndwiAvailable ? Number(((waterPixels / validPixels) * 100).toFixed(2)) : null,
+        flood_candidate_percent: ndwiAvailable ? Number(((floodCandidatePixels / validPixels) * 100).toFixed(2)) : null,
+        dimensions: { width: redBand.width, height: redBand.height },
+        thresholds: { ndwi_water: 0.2, ndvi_low_vegetation: 0.2 },
+        live_model: false,
+        methodology: 'NDVI=(NIR-Red)/(NIR+Red); NDWI=(Green-NIR)/(Green+NIR). Candidates require temporal, hydrological, and analyst validation.',
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: true, message: `Could not read the spectral bands: ${error.message}` });
+    } finally {
+      for (const file of [red, nir, green]) {
+        if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      }
+    }
+  }
+);
+
 // POST /api/vqa -> SIH Contract
 router.post('/vqa', upload.single('image'), async (req: Request, res: Response) => {
   const filePath = req.file ? req.file.path : null;
@@ -24,16 +120,29 @@ router.post('/vqa', upload.single('image'), async (req: Request, res: Response) 
 
   try {
     const groundedResult = await groundingEngine.processQuery(question, filePath);
+    if ((groundedResult as any).error || !groundedResult.answer) {
+      return res.status(503).json({
+        error: true,
+        message: (groundedResult as any).errorMessage || 'Analysis unavailable — vision model service did not return a result. Check model connection.',
+        answer: null
+      });
+    }
+
     const directAnswer = groundedResult.ml_analysis?.prediction || groundedResult.answer;
+    const isConfident = (groundedResult as any).ml_analysis?.confident !== false;
     res.json({
       answer: directAnswer,
       sources: groundedResult.sources,
-      evidence: groundedResult.evidence
+      evidence: groundedResult.evidence,
+      verified: isConfident,
+      confident: isConfident,
+      raw_first_answer: (groundedResult as any).ml_analysis?.raw_first_answer,
+      self_check_response: (groundedResult as any).ml_analysis?.self_check_response
     });
   } catch (err: any) {
-    res.status(500).json({
+    res.status(err instanceof ColabUnavailableError ? err.statusCode : 503).json({
       error: true,
-      message: err.message || 'VQA processing error'
+      message: err.message || 'VQA processing error — model service unavailable.'
     });
   } finally {
     if (filePath && fs.existsSync(filePath)) {
@@ -61,17 +170,16 @@ router.post(
 
     try {
       const modelRes = await colabBridge.queryChangeDetection(formattedQuery, img1Path, img2Path);
-      const pixelDiff = modelRes.expansionHa || 18.6;
-      const hasVerifiedChange = pixelDiff > 1.0;
 
       res.json({
         answer: `Bi-temporal change analysis (${date1} vs ${date2}): ${modelRes.answer}`,
         raw_model_answer: modelRes.answer,
-        pixel_diff_percent: parseFloat(pixelDiff.toFixed(1)),
-        verified_change: hasVerifiedChange
+        pixel_diff_percent: modelRes.expansionHa ?? null,
+        verified_change: modelRes.expansionHa == null ? null : modelRes.expansionHa > 1.0,
+        live_model: modelRes.live_model
       });
     } catch (err: any) {
-      res.status(500).json({
+      res.status(err instanceof ColabUnavailableError ? err.statusCode : 500).json({
         error: true,
         message: err.message || 'Change detection processing error'
       });
@@ -94,16 +202,14 @@ router.post('/grounding', upload.single('image'), async (req: Request, res: Resp
   try {
     const groundRes = await colabBridge.queryGrounding(feature, filePath);
     
-    // Check if feature was found
-    const featureFound = !feature.toLowerCase().includes('nonexistent') && !feature.toLowerCase().includes('notfound');
-    const bboxPercent = featureFound ? [20.0, 15.0, 65.0, 55.0] : null;
-
     res.json({
       raw_response: groundRes.answer,
-      bbox_percent: bboxPercent
+      bbox_percent: null,
+      live_model: groundRes.live_model,
+      bounding_box: groundRes.bounding_box
     });
   } catch (err: any) {
-    res.status(500).json({
+    res.status(err instanceof ColabUnavailableError ? err.statusCode : 500).json({
       error: true,
       message: err.message || 'Grounding processing error'
     });

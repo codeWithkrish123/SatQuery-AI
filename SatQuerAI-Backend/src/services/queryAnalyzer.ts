@@ -32,11 +32,11 @@ export class QueryAnalyzer {
 
     // Intent determination
     let intent: 'satellite_information' | 'scene_analysis' | 'change_detection' | 'grounding' = 'satellite_information';
-    if (q.includes('change') || q.includes('delta') || q.includes('before') || q.includes('shift')) {
+    if (q.includes('change') || q.includes('delta') || q.includes('before') || q.includes('shift') || q.includes('growth')) {
       intent = 'change_detection';
-    } else if (q.includes('locate') || q.includes('find') || q.includes('bounding box') || q.includes('grounding')) {
+    } else if (q.includes('locate') || q.includes('find') || q.includes('bounding box') || q.includes('grounding') || q.includes('bbox')) {
       intent = 'grounding';
-    } else if (hasImage || q.includes('image') || q.includes('scene') || q.includes('flooded')) {
+    } else if (hasImage || q.includes('image') || q.includes('scene') || q.includes('flood') || q.includes('water') || q.includes('reservoir') || q.includes('boundary') || q.includes('identify') || q.includes('detect') || q.includes('describe') || q.includes('risk') || q.includes('terrain')) {
       intent = 'scene_analysis';
     }
 

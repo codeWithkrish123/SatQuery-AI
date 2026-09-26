@@ -1,0 +1,1 @@
+{"status":"ready","model":"Qwen/Qwen2-VL-7B-Instruct"}

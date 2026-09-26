@@ -54,45 +54,51 @@ export class GroundingEngine {
 
     // 5. ML Model Inference execution when required
     let mlResult: any = null;
-    if (intent.requires_image_analysis) {
-      if (intent.intent === 'change_detection') {
-        const changeRes = await colabBridge.queryChangeDetection(userQuery, imagePath, imagePath);
-        mlResult = {
-          model: 'Qwen2-VL-7B-Instruct',
-          prediction: changeRes.answer,
-          confidence: changeRes.confidence / 100,
-          model_version: 'Qwen2-VL-7B-Instruct-v1.0'
-        };
-      } else if (intent.intent === 'grounding') {
-        const groundRes = await colabBridge.queryGrounding(userQuery, imagePath);
-        mlResult = {
-          model: 'Qwen2-VL-7B-Instruct',
-          prediction: groundRes.answer,
-          confidence: groundRes.confidence / 100,
-          model_version: 'Qwen2-VL-7B-Instruct-v1.0'
-        };
-      } else {
-        const vqaRes = await colabBridge.queryVQA(userQuery, imagePath);
-        mlResult = {
-          model: 'Qwen2-VL-7B-Instruct',
-          prediction: vqaRes.answer,
-          confidence: vqaRes.confidence / 100,
-          model_version: 'Qwen2-VL-7B-Instruct-v1.0'
-        };
+    try {
+      if (intent.requires_image_analysis || imagePath) {
+        if (intent.intent === 'change_detection') {
+          const changeRes = await colabBridge.queryChangeDetection(userQuery, imagePath, imagePath);
+          mlResult = {
+            model: 'Qwen2-VL-7B-Instruct',
+            prediction: changeRes.answer,
+            confidence: changeRes.confidence / 100,
+            model_version: 'Qwen2-VL-7B-Instruct-v1.0'
+          };
+        } else if (intent.intent === 'grounding') {
+          const groundRes = await colabBridge.queryGrounding(userQuery, imagePath);
+          mlResult = {
+            model: 'Qwen2-VL-7B-Instruct',
+            prediction: groundRes.answer,
+            confidence: groundRes.confidence / 100,
+            model_version: 'Qwen2-VL-7B-Instruct-v1.0'
+          };
+        } else {
+          const vqaRes = await colabBridge.queryVQA(userQuery, imagePath);
+          mlResult = {
+            model: 'Qwen2-VL-7B-Instruct',
+            prediction: vqaRes.answer,
+            confidence: vqaRes.confidence / 100,
+            model_version: 'Qwen2-VL-7B-Instruct-v1.0'
+          };
+        }
       }
+    } catch (err: any) {
+      console.warn(`[GroundingEngine] GPU Model Notice: ${err.message}. Defaulting to verified catalog & RAG evidence fallback.`);
     }
 
-    // 6. Evidence Threshold Check
+    // 6. Honest Error State when analysis is unavailable (No Fake/Canned Fallback)
     if (!satelliteMeta && topEvidence.length === 0 && !mlResult) {
       return {
-        answer: 'I could not verify this information from available trusted satellite sources.',
+        answer: null as any,
+        error: true,
+        errorMessage: "Analysis unavailable — the vision model service did not return a result. Check that the model GPU endpoint is active and try again.",
         sources: [],
         evidence: [],
         grounded: false,
         insufficient_evidence: true,
         ml_analysis: null,
         structured_intent: intent
-      };
+      } as any;
     }
 
     // 7. Grounded Answer Synthesis
@@ -139,7 +145,18 @@ export class GroundingEngine {
     }
 
     if (mlResult) {
-      answerText += `\nML Scene Inference (${mlResult.model}): ${mlResult.prediction}`;
+      sources.push({
+        source_id: 'ML-QWEN2-VL-7B',
+        title: 'Qwen2-VL-7B-Instruct (Visual Scene Analysis)',
+        url: 'https://huggingface.co/Qwen/Qwen2-VL-7B-Instruct',
+        source_type: 'visual_inference'
+      });
+
+      if (!satelliteMeta && topEvidence.length === 0) {
+        answerText = mlResult.prediction;
+      } else {
+        answerText += `\nVisual Scene Analysis: ${mlResult.prediction}`;
+      }
     }
 
     return {

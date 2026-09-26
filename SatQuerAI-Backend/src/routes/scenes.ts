@@ -1,10 +1,12 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
+import os from 'os';
 import { dbService, IScene } from '../db/db';
 
 const router = Router();
-const upload = multer({ dest: path.join(__dirname, '../../uploads/') });
+const uploadDest = process.env.VERCEL ? os.tmpdir() : path.join(__dirname, '../../uploads/');
+const upload = multer({ dest: uploadDest });
 
 // GET /api/scenes
 router.get('/', async (req: Request, res: Response) => {

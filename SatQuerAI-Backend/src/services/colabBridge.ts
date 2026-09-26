@@ -47,8 +47,12 @@ export class ColabUnavailableError extends Error {
 }
 
 class ColabBridgeService {
-  private get baseUrl(): string {
-    return (process.env.COLAB_MODEL_URL || 'https://attitude-tattoo-manhattan-bones.trycloudflare.com').replace(/\/+$/, '');
+  private get baseUrl(): string | null {
+    const url = process.env.COLAB_MODEL_URL?.trim();
+    if (!url || url.includes('attitude-tattoo-manhattan-bones.trycloudflare.com')) {
+      return null;
+    }
+    return url.replace(/\/+$/, '');
   }
 
   private buildGuardedQuestion(prompt: string): string {
@@ -130,6 +134,9 @@ class ColabBridgeService {
   }
 
   public async queryVQA(prompt: string, filePath: string | null): Promise<IVQAResponse> {
+    if (!this.baseUrl) {
+      throw new ColabUnavailableError('Colab Qwen API endpoint is not configured (COLAB_MODEL_URL is unset).');
+    }
     const guardedPrompt = this.buildGuardedQuestion(prompt);
     try {
       const formData = new FormData();
@@ -199,6 +206,9 @@ class ColabBridgeService {
   }
 
   public async queryGrounding(prompt: string, filePath: string | null): Promise<IGroundingResponse> {
+    if (!this.baseUrl) {
+      throw new ColabUnavailableError('Colab Qwen API endpoint is not configured (COLAB_MODEL_URL is unset).');
+    }
     try {
       const formData = new FormData();
       formData.append('question', `You are an expert satellite vision system. Locate and output bounding box for feature: ${prompt}`);
@@ -230,6 +240,9 @@ class ColabBridgeService {
   }
 
   public async queryChangeDetection(prompt: string, baselinePath: string | null, currentPath: string | null): Promise<IChangeDetectionResponse> {
+    if (!this.baseUrl) {
+      throw new ColabUnavailableError('Colab Qwen API endpoint is not configured (COLAB_MODEL_URL is unset).');
+    }
     try {
       const formData = new FormData();
       formData.append('question', `System: You are an expert satellite remote sensing vision model analyzing Earth observation imagery for surface change. Query: ${prompt}`);

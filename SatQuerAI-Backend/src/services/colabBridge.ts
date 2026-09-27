@@ -49,7 +49,7 @@ export class ColabUnavailableError extends Error {
 class ColabBridgeService {
   private get baseUrl(): string | null {
     const url = process.env.COLAB_MODEL_URL?.trim();
-    if (!url || url.includes('attitude-tattoo-manhattan-bones.trycloudflare.com')) {
+    if (!url) {
       return null;
     }
     return url.replace(/\/+$/, '');

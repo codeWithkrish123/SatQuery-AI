@@ -88,7 +88,7 @@ class DatabaseService {
   }
 
   public getSystemStatus(): ISystemStatus {
-    const modelUrl = process.env.COLAB_MODEL_URL || 'https://attitude-tattoo-manhattan-bones.trycloudflare.com';
+    const modelUrl = process.env.COLAB_MODEL_URL?.trim();
     const isModelConfigured = !!modelUrl;
     return {
       status: 'ONLINE',

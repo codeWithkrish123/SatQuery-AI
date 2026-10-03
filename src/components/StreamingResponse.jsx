@@ -167,76 +167,6 @@ export default function StreamingResponse({
           : 'pt-0.5'
       }`}
     >
-      {/* Top Header Badge Row */}
-      <div className="flex items-center justify-between gap-2 pb-1.5 mb-2 font-mono text-[10px]">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E6F4F1] text-[#087D86] font-bold border border-[#00A3A6]/20 shadow-2xs">
-            <Sparkles className="w-3 h-3 text-[#00A3A6] animate-pulse" />
-            <span>{model || 'Gemini Vision AI'}</span>
-          </div>
-
-          {isLive && (
-            <span className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200 text-[9px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              VERIFIED 24/7
-            </span>
-          )}
-        </div>
-
-        {/* Action Buttons: Listen & Copy */}
-        <div className="flex items-center gap-1">
-          {/* Read Aloud Button */}
-          <button
-            type="button"
-            onClick={handleToggleSpeak}
-            title={isSpeaking ? 'Stop Reading' : 'Read Aloud'}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
-              isSpeaking
-                ? 'bg-[#00A3A6] text-white shadow-xs animate-pulse'
-                : 'bg-slate-100 text-slate-600 hover:bg-[#E6F4F1] hover:text-[#087D86]'
-            }`}
-          >
-            {isSpeaking ? (
-              <>
-                <VolumeX className="w-3 h-3" />
-                <span className="hidden xs:inline">STOP</span>
-                {/* Audio Wave animation bars */}
-                <span className="flex items-end gap-0.5 h-2.5 ml-1">
-                  <span className="w-0.5 h-full bg-white animate-[bounce_0.6s_infinite_100ms]" />
-                  <span className="w-0.5 h-2 bg-white animate-[bounce_0.6s_infinite_200ms]" />
-                  <span className="w-0.5 h-3 bg-white animate-[bounce_0.6s_infinite_300ms]" />
-                </span>
-              </>
-            ) : (
-              <>
-                <Volume2 className="w-3 h-3" />
-                <span className="hidden xs:inline">LISTEN</span>
-              </>
-            )}
-          </button>
-
-          {/* Copy Button */}
-          <button
-            type="button"
-            onClick={handleCopy}
-            title="Copy Response"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors text-[10px] font-mono font-semibold"
-          >
-            {copied ? (
-              <>
-                <Check className="w-3 h-3 text-emerald-600" />
-                <span className="text-emerald-700">COPIED</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3 h-3" />
-                <span className="hidden xs:inline">COPY</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
       {/* Main Content with Typewriter / Streaming animation */}
       <div className="relative leading-relaxed">
         {renderFormattedContent(displayedText)}
@@ -245,6 +175,56 @@ export default function StreamingResponse({
         {isTyping && (
           <span className="inline-block w-2 h-3.5 ml-1 bg-[#00A3A6] rounded-xs animate-pulse align-middle shadow-[0_0_8px_#00A3A6]" />
         )}
+      </div>
+
+      {/* Bottom Action Bar: Read Aloud & Copy (Sleek & minimal) */}
+      <div className="flex items-center gap-1.5 pt-1.5 text-slate-400">
+        <button
+          type="button"
+          onClick={handleToggleSpeak}
+          title={isSpeaking ? 'Stop Reading' : 'Read Aloud'}
+          className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono transition-all ${
+            isSpeaking
+              ? 'text-[#00A3A6] bg-[#E6F4F1] font-bold shadow-2xs'
+              : 'hover:text-slate-700 hover:bg-slate-100'
+          }`}
+        >
+          {isSpeaking ? (
+            <>
+              <VolumeX className="w-3.5 h-3.5 text-[#00A3A6]" />
+              <span>Stop</span>
+              <span className="flex items-end gap-0.5 h-2.5 ml-1">
+                <span className="w-0.5 h-full bg-[#00A3A6] animate-[bounce_0.6s_infinite_100ms]" />
+                <span className="w-0.5 h-2 bg-[#00A3A6] animate-[bounce_0.6s_infinite_200ms]" />
+                <span className="w-0.5 h-3 bg-[#00A3A6] animate-[bounce_0.6s_infinite_300ms]" />
+              </span>
+            </>
+          ) : (
+            <>
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>Listen</span>
+            </>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleCopy}
+          title="Copy Response"
+          className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono hover:text-slate-700 hover:bg-slate-100 transition-colors"
+        >
+          {copied ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="text-emerald-700 font-semibold">Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3.5 h-3.5" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* Grounded Source Citations */}

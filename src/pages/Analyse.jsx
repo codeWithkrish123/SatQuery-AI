@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AIOrb from '../components/AIOrb';
 import StreamingResponse from '../components/StreamingResponse';
 import VoicePromptBar from '../components/VoicePromptBar';
+import { API_BASE_URL } from '../config/api';
 
 export default function Analyse() {
   const [activeTab, setActiveTab] = useState('vqa'); // 'vqa' | 'change' | 'grounding' | 'spectral'
@@ -93,8 +94,6 @@ export default function Analyse() {
     const file = event.target.files[0];
     if (file) setSpectralBands((current) => ({ ...current, [band]: file }));
   };
-
-  const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://satquery-backend-sandy.vercel.app').split(',')[0].trim().replace(/\/+$/, '');
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();

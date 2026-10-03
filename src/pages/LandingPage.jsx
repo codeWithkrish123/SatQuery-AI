@@ -24,6 +24,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import EarthGlobe3D from '../components/EarthGlobe3D';
+import { API_BASE_URL } from '../config/api';
 
 const rotatingWords = [
   "Intelligence.",
@@ -125,8 +126,6 @@ export default function LandingPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [scrolledNav, setScrolledNav] = useState(false);
   const [systemStatus, setSystemStatus] = useState(null);
-
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://satquery-backend-sandy.vercel.app';
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/system/status`)

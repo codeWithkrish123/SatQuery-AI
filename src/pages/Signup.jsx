@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Mail, Building2, Lock, ShieldCheck, ArrowLeft, ArrowRight } from 'lucide-react';
 import AuthVisualCarousel from '../components/AuthVisualCarousel';
+import { API_BASE_URL } from '../config/api';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -14,7 +15,6 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://satquery-backend-sandy.vercel.app';
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '88401843727-9ukv0sck0jgjnpn0vs8ijk7968pek926.apps.googleusercontent.com';
 
   useEffect(() => {

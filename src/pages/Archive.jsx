@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, ArrowRight } from 'lucide-react';
+import { API_BASE_URL } from '../config/api';
 
 export default function Archive() {
   const [archive, setArchive] = useState([]);
   const [search, setSearch] = useState('');
   const [modeFilter, setModeFilter] = useState('All');
-
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://satquery-backend-sandy.vercel.app';
 
   useEffect(() => {
     fetchArchive();

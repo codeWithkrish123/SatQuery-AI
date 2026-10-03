@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, X } from 'lucide-react';
+import { API_BASE_URL } from '../config/api';
 
 export default function Scenes() {
   const [filter, setFilter] = useState('All');
@@ -10,8 +11,6 @@ export default function Scenes() {
   const [newSceneName, setNewSceneName] = useState('');
   const [newSatellite, setNewSatellite] = useState('LISS-IV / EOS-04');
   const [newType, setNewType] = useState('LISS-IV');
-
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://satquery-backend-sandy.vercel.app';
 
   useEffect(() => {
     fetchScenes();

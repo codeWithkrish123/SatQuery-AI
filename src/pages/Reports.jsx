@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Download, ShieldCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { API_BASE_URL } from '../config/api';
 
 export default function Reports() {
   const [reportData, setReportData] = useState(null);
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://satquery-backend-sandy.vercel.app';
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/reports`)

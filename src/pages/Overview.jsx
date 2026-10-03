@@ -18,14 +18,13 @@ import {
   TrendingUp,
   ArrowRight
 } from 'lucide-react';
+import { API_BASE_URL } from '../config/api';
 
 export default function Overview() {
   const [systemStatus, setSystemStatus] = useState(null);
   const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userDisplay, setUserDisplay] = useState('Analyst');
-
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://satquery-backend-sandy.vercel.app';
 
   const fetchOverviewData = async () => {
     setLoading(true);

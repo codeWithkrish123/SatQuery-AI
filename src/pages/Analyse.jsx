@@ -214,11 +214,11 @@ export default function Analyse() {
 
   return (
     <div className="aerospace-page mx-auto w-full max-w-7xl space-y-8 p-6 font-sans md:p-10">
-      {/* SIH Header */}
+      {/* Workspace Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div className="space-y-1">
           <p className="mission-label">
-            // SIH26167 · ISRO SATELLITE INTELLIGENCE
+            // ISRO SATELLITE INTELLIGENCE
           </p>
           <h1 className="font-serif text-3xl font-normal tracking-tight text-slate-900 md:text-5xl">
             Analyse a Scene
@@ -332,7 +332,7 @@ export default function Analyse() {
                     </div>
                   )}
 
-                  {/* Grounding BBox Percentage Canvas Overlay (SIH Contract: 0-100% converted to displayed pixels) */}
+                  {/* Grounding BBox Percentage Canvas Overlay (0-100% normalized coordinates converted to displayed pixels) */}
                   {activeTab === 'grounding' && response && response.bbox_percent && (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.9 }}

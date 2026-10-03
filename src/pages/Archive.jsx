@@ -17,9 +17,39 @@ export default function Archive() {
 
   const fetchArchive = async () => {
     try {
+      let localArchive = [];
+      try {
+        localArchive = JSON.parse(localStorage.getItem('satquery_user_archive') || '[]');
+      } catch (e) {}
+
       const res = await fetch(`${API_BASE_URL}/api/archive?search=${encodeURIComponent(search)}&mode=${encodeURIComponent(modeFilter)}`);
       const data = await res.json();
-      if (data.archive) setArchive(data.archive);
+      
+      const backendItems = (data && data.archive) ? data.archive : [];
+      const merged = [...localArchive];
+
+      backendItems.forEach((bItem) => {
+        if (!merged.some(m => m.id === bItem.id || m.query === bItem.query)) {
+          merged.push(bItem);
+        }
+      });
+
+      // Apply client-side search and mode filtering if specified
+      let filtered = merged;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        filtered = filtered.filter(item => 
+          (item.query && item.query.toLowerCase().includes(q)) ||
+          (item.location && item.location.toLowerCase().includes(q)) ||
+          (item.scene && item.scene.toLowerCase().includes(q)) ||
+          (item.id && item.id.toLowerCase().includes(q))
+        );
+      }
+      if (modeFilter && modeFilter !== 'All') {
+        filtered = filtered.filter(item => item.mode === modeFilter);
+      }
+
+      setArchive(filtered);
     } catch (err) {
       console.error('Failed to fetch archive:', err);
     } finally {

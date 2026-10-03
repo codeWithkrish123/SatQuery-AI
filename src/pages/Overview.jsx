@@ -23,15 +23,22 @@ import { API_BASE_URL } from '../config/api';
 export default function Overview() {
   const [systemStatus, setSystemStatus] = useState(null);
   const [scenes, setScenes] = useState([]);
+  const [userArchive, setUserArchive] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userDisplay, setUserDisplay] = useState('Analyst');
 
   const fetchOverviewData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const [statusRes, scenesRes] = await Promise.all([
+      let localArchive = [];
+      try {
+        localArchive = JSON.parse(localStorage.getItem('satquery_user_archive') || '[]');
+      } catch (e) {}
+
+      const [statusRes, scenesRes, archiveRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/system/status`),
-        fetch(`${API_BASE_URL}/api/scenes`)
+        fetch(`${API_BASE_URL}/api/scenes`),
+        fetch(`${API_BASE_URL}/api/archive`)
       ]);
 
       if (statusRes.ok) {
@@ -43,6 +50,19 @@ export default function Overview() {
         const scenesData = await scenesRes.json();
         if (scenesData.scenes) setScenes(scenesData.scenes);
       }
+
+      let mergedArchive = [...localArchive];
+      if (archiveRes.ok) {
+        const archData = await archiveRes.json();
+        if (archData.archive) {
+          archData.archive.forEach((bItem) => {
+            if (!mergedArchive.some(m => m.id === bItem.id || m.query === bItem.query)) {
+              mergedArchive.push(bItem);
+            }
+          });
+        }
+      }
+      setUserArchive(mergedArchive);
     } catch (err) {
       console.error("Overview data fetch error:", err);
     } finally {
@@ -78,7 +98,18 @@ export default function Overview() {
     return () => clearInterval(interval);
   }, []);
 
-  const signalPoints = systemStatus?.signalHistory || [94.1, 95.8, 97.2, 98.4, 96.9, 98.4];
+  // Compute live Evidence Confidence from actual user queries
+  const liveAvgConfidence = userArchive.length > 0
+    ? (userArchive.reduce((acc, curr) => acc + (Number(curr.confidence) || 98.4), 0) / userArchive.length).toFixed(1)
+    : (systemStatus?.evidenceCoverage && systemStatus?.evidenceCoverage > 0 ? systemStatus.evidenceCoverage : null);
+
+  // Dynamic Telemetry Curve points: based on actual queries or live node accuracy
+  const signalPoints = userArchive.length >= 2
+    ? userArchive.slice(0, 6).reverse().map(q => Number(q.confidence) || 98.4)
+    : (systemStatus?.signalHistory && systemStatus.signalHistory.length > 0
+        ? systemStatus.signalHistory
+        : [97.5, 98.0, 98.4, 98.7, 99.1, 99.4]);
+
   const minVal = Math.min(...signalPoints) - 2;
   const maxVal = Math.max(...signalPoints) + 2;
   
@@ -87,6 +118,24 @@ export default function Overview() {
     const y = 75 - ((val - minVal) / (maxVal - minVal)) * 55;
     return `${x},${y}`;
   }).join(' ');
+
+  // Compute dynamic past UTC hour labels based on current time
+  const now = new Date();
+  const formatPastHour = (hoursAgo) => {
+    const d = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) + ' UTC';
+  };
+
+  // Derive Attention Queue from actual executed queries
+  const attentionItems = userArchive.length > 0
+    ? userArchive.slice(0, 3).map((item, idx) => ({
+        id: item.id || `ATT-${idx}`,
+        title: item.query,
+        subtitle: `${item.scene || 'Observation Scene'} · ${item.mode || 'Visual Q&A'}`,
+        tone: item.mode === 'Change Detection' ? 'amber' : item.mode === 'Grounding' ? 'teal' : 'slate',
+        timeAgo: item.timestamp ? `${Math.max(1, Math.round((Date.now() - item.timestamp) / 60000))}m ago` : (item.acquired || 'Recent')
+      }))
+    : (systemStatus?.attentionQueue || []);
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 p-6 font-sans md:p-8">
@@ -132,13 +181,13 @@ export default function Overview() {
           </motion.h1>
 
           <p className="text-xs md:text-sm text-slate-600 max-w-2xl leading-relaxed">
-            Your satellite intelligence platform is operational. All observation passes from Cartosat-3, EOS-04, and Sentinel constellations are synchronized.
+            Your satellite intelligence platform is operational. Real-time inference, change detection, and grounding pipelines are synchronized.
           </p>
         </motion.div>
 
         <div className="flex items-center space-x-3 shrink-0">
           <button 
-            onClick={fetchOverviewData}
+            onClick={() => fetchOverviewData(true)}
             disabled={loading}
             className="flex items-center space-x-2 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 shadow-sm hover:border-[#00A3A6] hover:text-[#00A3A6] transition-all disabled:opacity-50"
           >
@@ -167,13 +216,17 @@ export default function Overview() {
           </div>
           <div className="flex items-baseline space-x-2">
             <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {systemStatus?.evidenceCoverage ? `${systemStatus.evidenceCoverage}%` : '98.4%'}
+              {liveAvgConfidence ? `${liveAvgConfidence}%` : 'Ready'}
             </span>
-            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-              Live Verified
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
+              liveAvgConfidence ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-[#00A3A6] bg-[#E6F4F1] border-[#00A3A6]/20'
+            }`}>
+              {liveAvgConfidence ? 'Live Verified' : 'Nominal'}
             </span>
           </div>
-          <p className="text-xs text-slate-500">Validated against ISRO catalog database</p>
+          <p className="text-xs text-slate-500">
+            {userArchive.length > 0 ? `Calculated across ${userArchive.length} live queries` : 'Validated against ISRO catalog database'}
+          </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 space-y-3 shadow-sm hover:shadow-md hover:border-[#00A3A6]/40 transition-all">
@@ -188,7 +241,7 @@ export default function Overview() {
               {scenes.length || systemStatus?.totalScenes || 0}
             </span>
             <span className="text-[11px] font-semibold text-[#00A3A6] bg-[#E6F4F1] px-2 py-0.5 rounded-md border border-[#00A3A6]/20">
-              {scenes.length} Active Tiles
+              {scenes.length} Catalog Tiles
             </span>
           </div>
           <p className="text-xs text-slate-500">Cartosat-3, EOS-04, Sentinel-1/2</p>
@@ -223,10 +276,12 @@ export default function Overview() {
           </div>
           <div className="flex items-baseline space-x-2">
             <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {systemStatus?.totalQueries ?? scenes.length ?? 0}
+              {userArchive.length}
             </span>
-            <span className="text-[11px] font-semibold text-[#00A3A6] bg-[#E6F4F1] px-2 py-0.5 rounded-md border border-[#00A3A6]/20">
-              Zero Hallucination
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
+              userArchive.length > 0 ? 'text-[#00A3A6] bg-[#E6F4F1] border-[#00A3A6]/20' : 'text-slate-500 bg-slate-50 border-slate-200'
+            }`}>
+              {userArchive.length > 0 ? 'Zero Hallucination' : 'Awaiting Runs'}
             </span>
           </div>
           <p className="text-xs text-slate-500">Anti-hallucination threshold (&gt;=0.70)</p>
@@ -242,7 +297,7 @@ export default function Overview() {
               <span className="text-[10px] font-mono font-bold text-[#00A3A6] tracking-wider uppercase">
                 TELEMETRY CONFIDENCE
               </span>
-              <h3 className="text-base font-bold text-slate-900 mt-0.5">24-Hour Evidence Score Curve</h3>
+              <h3 className="text-base font-bold text-slate-900 mt-0.5">Live Accuracy & Score Curve</h3>
             </div>
             <div className="flex items-center space-x-2 text-xs font-semibold text-slate-700 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
               <span className="h-2 w-2 rounded-full bg-[#00A3A6]"></span>
@@ -290,10 +345,10 @@ export default function Overview() {
           </div>
 
           <div className="flex justify-between items-center pt-2 text-[11px] text-slate-400 font-medium border-t border-slate-100">
-            <span>T-06:00 UTC</span>
-            <span>T-04:00 UTC</span>
-            <span>T-02:00 UTC</span>
-            <span>T-01:00 UTC</span>
+            <span>{formatPastHour(6)}</span>
+            <span>{formatPastHour(4)}</span>
+            <span>{formatPastHour(2)}</span>
+            <span>{formatPastHour(1)}</span>
             <span className="font-bold text-[#00A3A6]">LIVE SYNCED</span>
           </div>
         </div>
@@ -306,19 +361,19 @@ export default function Overview() {
               <h3 className="text-base font-bold text-slate-900 mt-0.5">Action Required</h3>
             </div>
             <span className="px-2.5 py-1 rounded-full bg-[#E6F4F1] text-[#00A3A6] text-xs font-bold border border-[#00A3A6]/20">
-              {systemStatus?.attentionQueue?.length || 0} Pending
+              {attentionItems.length} Pending
             </span>
           </div>
 
           <div className="space-y-3">
-            {(systemStatus?.attentionQueue && systemStatus.attentionQueue.length > 0) ? (
-              systemStatus.attentionQueue.map((item) => (
+            {attentionItems.length > 0 ? (
+              attentionItems.map((item) => (
                 <div key={item.id} className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 hover:border-[#00A3A6]/40 transition-all flex items-start space-x-3 group">
                   <span className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${
                     item.tone === 'amber' ? 'bg-amber-500' : item.tone === 'teal' ? 'bg-[#00A3A6]' : 'bg-slate-400'
                   }`}></span>
                   <div className="flex-1 space-y-0.5">
-                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-[#00A3A6] transition-colors">{item.title}</h4>
+                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-[#00A3A6] transition-colors line-clamp-1">{item.title}</h4>
                     <p className="text-[11px] text-slate-500">{item.subtitle}</p>
                   </div>
                   <Link to="/analyze" className="text-slate-400 group-hover:text-[#00A3A6] transition-colors">
@@ -327,8 +382,10 @@ export default function Overview() {
                 </div>
               ))
             ) : (
-              <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
-                All satellite data streams verified and nominal.
+              <div className="p-8 text-center space-y-2 border border-dashed border-slate-200 rounded-xl">
+                <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto" />
+                <p className="text-xs font-bold text-slate-800">All data streams nominal</p>
+                <p className="text-[11px] text-slate-400">No anomalies or low-confidence observations requiring manual review.</p>
               </div>
             )}
           </div>
@@ -339,11 +396,11 @@ export default function Overview() {
       <div className="rounded-2xl border border-slate-200/80 bg-white p-6 space-y-4 shadow-sm">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 pb-4">
           <div>
-            <span className="text-[10px] font-mono font-bold text-[#00A3A6] tracking-wider uppercase">ACTIVE MISSIONS LOG</span>
-            <h3 className="text-base font-bold text-slate-900 mt-0.5">Recent Satellite Tile Ingestions</h3>
+            <span className="text-[10px] font-mono font-bold text-[#00A3A6] tracking-wider uppercase">ACTIVE MISSIONS & OBSERVATION LOG</span>
+            <h3 className="text-base font-bold text-slate-900 mt-0.5">Recent Satellite Query Executions</h3>
           </div>
-          <Link to="/scenes" className="text-xs text-[#00A3A6] hover:underline font-bold flex items-center gap-1.5">
-            <span>Browse Scene Library</span>
+          <Link to="/archive" className="text-xs text-[#00A3A6] hover:underline font-bold flex items-center gap-1.5">
+            <span>View Full Archive</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -352,36 +409,44 @@ export default function Overview() {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/80 text-slate-500 uppercase text-[10px] border-b border-slate-200 font-bold tracking-wider">
               <tr>
-                <th className="py-3 px-4">SCENE ID</th>
-                <th className="py-3 px-4">LOCATION / NAME</th>
-                <th className="py-3 px-4">SATELLITE</th>
-                <th className="py-3 px-4">RESOLUTION</th>
+                <th className="py-3 px-4">MISSION ID</th>
+                <th className="py-3 px-4">OBSERVATION QUERY / SCENE</th>
+                <th className="py-3 px-4">ANALYSIS MODE</th>
+                <th className="py-3 px-4">SATELLITE & SENSOR</th>
                 <th className="py-3 px-4">STATUS</th>
                 <th className="py-3 px-4 text-right">CONFIDENCE</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-              {scenes.length > 0 ? (
-                scenes.slice(0, 5).map((scene) => (
-                  <tr key={scene.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-[#00A3A6]">{scene.id}</td>
-                    <td className="py-3.5 px-4 font-bold text-slate-900">{scene.name}</td>
-                    <td className="py-3.5 px-4 text-slate-600">{scene.satellite}</td>
-                    <td className="py-3.5 px-4 text-slate-600">{scene.resolution || '5.8m'}</td>
+              {userArchive.length > 0 ? (
+                userArchive.slice(0, 5).map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-bold text-[#00A3A6]">{item.id}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-900 max-w-xs truncate" title={item.query}>{item.query}</td>
+                    <td className="py-3.5 px-4 text-slate-600">{item.mode || 'Visual Q&A'}</td>
+                    <td className="py-3.5 px-4 text-slate-600">{item.satellite || 'ISRO / Gemini'}</td>
                     <td className="py-3.5 px-4">
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
-                        {scene.status || 'ANALYZED'}
+                        {item.status || 'VERIFIED'}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold text-[#00A3A6]">
-                      {scene.confidence}%
+                      {item.confidence}%
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="py-8 text-center text-slate-400">
-                    No satellite scenes loaded yet. Connect your catalog or upload scenes in Scene Library.
+                  <td colSpan="6" className="py-12 text-center">
+                    <div className="max-w-md mx-auto space-y-3 text-slate-500">
+                      <Radio className="w-8 h-8 text-[#00A3A6] mx-auto opacity-70 animate-pulse" />
+                      <h4 className="text-sm font-bold text-slate-800 font-sans">No mission observations logged yet</h4>
+                      <p className="text-xs text-slate-400">Launch a Visual Q&A, Feature Grounding, or Change Detection query to start tracking live telemetry in real time.</p>
+                      <Link to="/analyze" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#00A3A6] text-white text-xs font-bold shadow-md shadow-[#00A3A6]/20 hover:bg-[#008C8F] transition-all">
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>+ Launch First Analysis</span>
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               )}

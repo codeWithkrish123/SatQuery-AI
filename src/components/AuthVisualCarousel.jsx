@@ -34,7 +34,7 @@ const carouselSlides = [
     id: 4,
     tag: '3D VISION & RAG FUSION',
     title: 'Evidence-Grounded Satellite AI',
-    description: 'Qwen2-VL vision model fused with ISRO and Copernicus authoritative catalogs to eliminate non-existent spectral hallucinations.',
+    description: 'Gemini 1.5 Cloud Vision model fused with ISRO and Copernicus authoritative catalogs to eliminate non-existent spectral hallucinations.',
     image: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=1200&auto=format&fit=crop&q=80',
     spec1: '98.4% Confidence',
     spec2: 'Zero Hallucination'

@@ -19,14 +19,18 @@ export default function Analyse() {
 
   const [spectralBands, setSpectralBands] = useState({ red: null, nir: null, green: null });
 
+  const now = new Date();
+  const past30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const formatDateNice = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
   // Change Detection Image & Date States
   const [image1, setImage1] = useState(null);
   const [image1Preview, setImage1Preview] = useState('https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600&auto=format&fit=crop&q=60');
-  const [date1, setDate1] = useState('14 August 2026');
+  const [date1, setDate1] = useState(formatDateNice(past30Days));
 
   const [image2, setImage2] = useState(null);
   const [image2Preview, setImage2Preview] = useState('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=60');
-  const [date2, setDate2] = useState('12 September 2026');
+  const [date2, setDate2] = useState(formatDateNice(now));
 
   // Grounding BBox Canvas Overlay Refs
   const groundingImageRef = useRef(null);

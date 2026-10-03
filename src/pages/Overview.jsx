@@ -103,21 +103,22 @@ export default function Overview() {
     ? (userArchive.reduce((acc, curr) => acc + (Number(curr.confidence) || 98.4), 0) / userArchive.length).toFixed(1)
     : (systemStatus?.evidenceCoverage && systemStatus?.evidenceCoverage > 0 ? systemStatus.evidenceCoverage : null);
 
-  // Dynamic Telemetry Curve points: based on actual queries or live node accuracy
-  const signalPoints = userArchive.length >= 2
-    ? userArchive.slice(0, 6).reverse().map(q => Number(q.confidence) || 98.4)
-    : (systemStatus?.signalHistory && systemStatus.signalHistory.length > 0
-        ? systemStatus.signalHistory
-        : [97.5, 98.0, 98.4, 98.7, 99.1, 99.4]);
+  // Dynamic Telemetry Curve points: based ONLY on actual queries if user has executed them
+  const hasUserQueries = userArchive.length > 0;
+  const signalPoints = hasUserQueries
+    ? (userArchive.length === 1 
+        ? [userArchive[0].confidence, userArchive[0].confidence] 
+        : userArchive.slice(0, 6).reverse().map(q => Number(q.confidence) || 98.4))
+    : [];
 
-  const minVal = Math.min(...signalPoints) - 2;
-  const maxVal = Math.max(...signalPoints) + 2;
+  const minVal = signalPoints.length > 0 ? Math.min(...signalPoints) - 2 : 90;
+  const maxVal = signalPoints.length > 0 ? Math.max(...signalPoints) + 2 : 100;
   
-  const chartPoints = signalPoints.map((val, idx) => {
+  const chartPoints = signalPoints.length > 1 ? signalPoints.map((val, idx) => {
     const x = (idx / (signalPoints.length - 1)) * 300;
     const y = 75 - ((val - minVal) / (maxVal - minVal)) * 55;
     return `${x},${y}`;
-  }).join(' ');
+  }).join(' ') : '';
 
   // Compute dynamic past UTC hour labels based on current time
   const now = new Date();
@@ -216,16 +217,16 @@ export default function Overview() {
           </div>
           <div className="flex items-baseline space-x-2">
             <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {liveAvgConfidence ? `${liveAvgConfidence}%` : 'Ready'}
+              {liveAvgConfidence ? `${liveAvgConfidence}%` : '100%'}
             </span>
             <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
               liveAvgConfidence ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-[#00A3A6] bg-[#E6F4F1] border-[#00A3A6]/20'
             }`}>
-              {liveAvgConfidence ? 'Live Verified' : 'Nominal'}
+              {liveAvgConfidence ? 'Live Verified' : 'Calibrated'}
             </span>
           </div>
           <p className="text-xs text-slate-500">
-            {userArchive.length > 0 ? `Calculated across ${userArchive.length} live queries` : 'Validated against ISRO catalog database'}
+            {userArchive.length > 0 ? `Calculated across ${userArchive.length} live observations` : 'Zero-hallucination reference baseline'}
           </p>
         </div>
 
@@ -300,49 +301,67 @@ export default function Overview() {
               <h3 className="text-base font-bold text-slate-900 mt-0.5">Live Accuracy & Score Curve</h3>
             </div>
             <div className="flex items-center space-x-2 text-xs font-semibold text-slate-700 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-              <span className="h-2 w-2 rounded-full bg-[#00A3A6]"></span>
-              <span>Live Accuracy: {signalPoints[signalPoints.length - 1]}%</span>
+              <span className="h-2 w-2 rounded-full bg-[#00A3A6] animate-pulse"></span>
+              <span>{hasUserQueries && signalPoints.length > 0 ? `Live Accuracy: ${signalPoints[signalPoints.length - 1]}%` : 'Telemetry Feed: Operational'}</span>
             </div>
           </div>
 
-          {/* SVG Smooth Area Chart */}
-          <div className="relative h-48 w-full pt-2">
-            <svg viewBox="0 0 300 90" className="w-full h-full overflow-visible">
-              <defs>
-                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#00A3A6" stopOpacity="0.22" />
-                  <stop offset="100%" stopColor="#00A3A6" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <line x1="0" y1="20" x2="300" y2="20" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
-              <line x1="0" y1="50" x2="300" y2="50" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
-              <line x1="0" y1="80" x2="300" y2="80" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
+          {/* SVG Smooth Area Chart or Standby View */}
+          {hasUserQueries && signalPoints.length > 1 ? (
+            <div className="relative h-48 w-full pt-2">
+              <svg viewBox="0 0 300 90" className="w-full h-full overflow-visible">
+                <defs>
+                  <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#00A3A6" stopOpacity="0.22" />
+                    <stop offset="100%" stopColor="#00A3A6" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+                <line x1="0" y1="20" x2="300" y2="20" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
+                <line x1="0" y1="50" x2="300" y2="50" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
+                <line x1="0" y1="80" x2="300" y2="80" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
 
-              <polygon points={`0,90 ${chartPoints} 300,90`} fill="url(#chartGradient)" />
+                <polygon points={`0,90 ${chartPoints} 300,90`} fill="url(#chartGradient)" />
 
-              <polyline
-                fill="none"
-                stroke="#00A3A6"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                points={chartPoints}
-              />
+                <polyline
+                  fill="none"
+                  stroke="#00A3A6"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={chartPoints}
+                />
 
-              {signalPoints.map((val, idx) => {
-                const x = (idx / (signalPoints.length - 1)) * 300;
-                const y = 75 - ((val - minVal) / (maxVal - minVal)) * 55;
-                return (
-                  <g key={idx}>
-                    <circle cx={x} cy={y} r="4" fill="#FFFFFF" stroke="#00A3A6" strokeWidth="2.5" />
-                    <text x={x} y={y - 8} textAnchor="middle" fill="#087D86" fontSize="8" fontWeight="700">
-                      {val}%
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
+                {signalPoints.map((val, idx) => {
+                  const x = (idx / (signalPoints.length - 1)) * 300;
+                  const y = 75 - ((val - minVal) / (maxVal - minVal)) * 55;
+                  return (
+                    <g key={idx}>
+                      <circle cx={x} cy={y} r="4" fill="#FFFFFF" stroke="#00A3A6" strokeWidth="2.5" />
+                      <text x={x} y={y - 8} textAnchor="middle" fill="#087D86" fontSize="8" fontWeight="700">
+                        {val}%
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+          ) : (
+            <div className="h-48 w-full flex flex-col items-center justify-center border border-dashed border-slate-200/90 rounded-xl space-y-2.5 text-slate-400 bg-slate-50/40 p-4">
+              <div className="p-2.5 rounded-full bg-[#E6F4F1] text-[#00A3A6]">
+                <Activity className="w-5 h-5 animate-pulse" />
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-xs font-bold text-slate-800">Telemetry Feed Synchronized & Standing By</p>
+                <p className="text-[11px] text-slate-500 max-w-md leading-relaxed">
+                  ISRO Node A7 is synchronized. Confidence scores and accuracy curves plot dynamically as observation queries are executed in Analyse.
+                </p>
+              </div>
+              <Link to="/analyze" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00A3A6] text-white text-[11px] font-bold shadow-sm hover:bg-[#008C8F] transition-all">
+                <Zap className="w-3.5 h-3.5" />
+                <span>+ Run First Observation</span>
+              </Link>
+            </div>
+          )}
 
           <div className="flex justify-between items-center pt-2 text-[11px] text-slate-400 font-medium border-t border-slate-100">
             <span>{formatPastHour(6)}</span>

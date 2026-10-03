@@ -117,7 +117,15 @@ export default function Scenes() {
 
               {/* Image Preview */}
               <div className="h-44 overflow-hidden relative bg-slate-100">
-                <img src={scene.thumbnail} alt={scene.name} className="w-full h-full object-cover" />
+                <img 
+                  src={scene.thumbnail} 
+                  alt={scene.name} 
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=60';
+                  }}
+                  className="w-full h-full object-cover" 
+                />
               </div>
 
               {/* Title & Date */}

@@ -127,7 +127,7 @@ export default function StreamingResponse({
 
       // Standard paragraphs
       return (
-        <p key={idx} className="text-slate-700 text-xs leading-relaxed font-sans mb-1.5">
+        <p key={idx} className="text-slate-800 text-[13px] sm:text-sm leading-relaxed font-sans mb-2">
           {formatInlineMarks(line)}
         </p>
       );
@@ -158,17 +158,17 @@ export default function StreamingResponse({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={`rounded-2xl border p-4.5 transition-all shadow-sm ${
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className={`w-full text-slate-800 ${
         isError
-          ? 'border-amber-300 bg-amber-50/90 text-amber-950'
-          : 'border-[#00A3A6]/30 bg-white/95 text-slate-800 backdrop-blur-md hover:border-[#00A3A6]/50'
+          ? 'p-3.5 rounded-2xl bg-amber-50/90 text-amber-950 border border-amber-200'
+          : 'pt-0.5'
       }`}
     >
       {/* Top Header Badge Row */}
-      <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5 mb-3 font-mono text-[10px]">
+      <div className="flex items-center justify-between gap-2 pb-1.5 mb-2 font-mono text-[10px]">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E6F4F1] text-[#087D86] font-bold border border-[#00A3A6]/20 shadow-2xs">
             <Sparkles className="w-3 h-3 text-[#00A3A6] animate-pulse" />

@@ -31,6 +31,7 @@ export default function Analyse() {
   // Grounding BBox Canvas Overlay Refs
   const groundingImageRef = useRef(null);
   const chatScrollRef = useRef(null);
+  const lastQueryRef = useRef('');
   const [renderedDimensions, setRenderedDimensions] = useState({ width: 0, height: 0 });
 
   const [loading, setLoading] = useState(false);
@@ -95,26 +96,44 @@ export default function Analyse() {
     if (file) setSpectralBands((current) => ({ ...current, [band]: file }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, overrideQuery) => {
     if (e && e.preventDefault) e.preventDefault();
     if (loading) return;
 
-    const queryText = activeTab === 'grounding'
-      ? (prompt.trim() || featureName || 'water body')
-      : activeTab === 'spectral'
-        ? 'Calculate NDVI and NDWI from uploaded spectral bands'
-        : prompt.trim() || (activeTab === 'change' ? 'Quantify shoreline delta' : 'Describe satellite scene features');
+    const trimmedPrompt = (overrideQuery != null ? overrideQuery : prompt).trim();
+    
+    // Strict guard: Do not send empty messages on VQA, Grounding, or Change Detection!
+    if (!trimmedPrompt && activeTab !== 'spectral') {
+      return;
+    }
+
+    const queryText = trimmedPrompt || (
+      activeTab === 'spectral' ? 'Calculate NDVI and NDWI from uploaded spectral bands' : ''
+    );
+
+    lastQueryRef.current = queryText;
 
     if (activeTab === 'grounding') {
       setFeatureName(queryText);
     }
+
+    // Immediately clear prompt input so user sees clean input box right away (no double sends)
+    setPrompt('');
+
+    // Only attach image thumbnail to the chat bubble on the FIRST time this image is sent in the thread
+    const alreadyShownInThread = messages.some(
+      (m) => m.image && m.image === singleImagePreview
+    );
+    const messageImage = (!alreadyShownInThread && (activeTab === 'vqa' || activeTab === 'grounding'))
+      ? singleImagePreview
+      : null;
 
     // Add user message to conversational thread
     setMessages((current) => [...current, {
       id: `user-${Date.now()}`,
       role: 'user',
       text: queryText,
-      image: (activeTab === 'vqa' || activeTab === 'grounding') ? singleImagePreview : null,
+      image: messageImage,
       tab: activeTab
     }]);
 
@@ -177,9 +196,6 @@ export default function Analyse() {
           verified_change: data.verified_change,
           pixel_diff_percent: data.pixel_diff_percent,
         }]);
-
-        // Clear prompt input after submission for clean conversational flow
-        setPrompt('');
       } else {
         let message = 'API server returned an error';
         if (res) {
@@ -209,7 +225,9 @@ export default function Analyse() {
   };
 
   const handleRetry = () => {
-    handleSubmit({ preventDefault: () => { } });
+    if (lastQueryRef.current) {
+      handleSubmit({ preventDefault: () => { } }, lastQueryRef.current);
+    }
   };
 
   return (
@@ -464,11 +482,11 @@ export default function Analyse() {
                     </div>
                   ) : (
                     /* Assistant Message with GPT/Claude/Gemini Typewriter & Motion */
-                    <div className="flex items-start gap-2.5">
-                      <div className="shrink-0 mt-1">
+                    <div className="flex items-start gap-3 py-1">
+                      <div className="shrink-0 mt-0.5">
                         <AIOrb state={message.isError ? 'error' : 'success'} compact />
                       </div>
-                      <div className="flex-1 space-y-3">
+                      <div className="flex-1 min-w-0 space-y-2">
                         <StreamingResponse
                           text={message.text}
                           sources={message.sources}
@@ -477,41 +495,41 @@ export default function Analyse() {
                           isLive={message.live_model}
                         />
 
-                        {/* Visual Badge Card for Grounding Coordinates if available */}
+                        {/* Inline Grounding Coordinates */}
                         {message.bbox && Array.isArray(message.bbox) && message.bbox.length === 4 && (
                           <motion.div
-                            initial={{ opacity: 0, y: 5 }}
+                            initial={{ opacity: 0, y: 4 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="flex items-center gap-2 p-2.5 rounded-xl bg-[#E6F4F1] border border-[#00A3A6]/30 text-xs font-mono text-[#087D86]"
+                            className="flex items-center gap-2 pt-1 font-mono text-[11px] text-[#087D86]"
                           >
-                            <Scan className="w-4 h-4 text-[#00A3A6]" />
-                            <span className="font-bold">BOUNDING BOX OVERLAY:</span>
-                            <span className="bg-white px-2 py-0.5 rounded border border-[#00A3A6]/20 font-bold">
+                            <Scan className="w-3.5 h-3.5 text-[#00A3A6]" />
+                            <span className="font-semibold text-slate-500">BOUNDING BOX:</span>
+                            <span className="px-2 py-0.5 rounded-md bg-[#E6F4F1] text-[#087D86] font-bold">
                               [{message.bbox.join(', ')}]%
                             </span>
                           </motion.div>
                         )}
 
-                        {/* Visual Badge Card for Change Detection if available */}
+                        {/* Inline Change Detection Telemetry */}
                         {message.verified_change !== undefined && (
                           <motion.div
-                            initial={{ opacity: 0, y: 5 }}
+                            initial={{ opacity: 0, y: 4 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="flex items-center justify-between p-3 rounded-xl bg-[#E6F4F1] border border-[#00A3A6]/30 font-mono text-xs"
+                            className="flex items-center justify-between pt-1 font-mono text-xs"
                           >
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center gap-2">
                               {message.verified_change ? (
-                                <span className="px-2.5 py-1 rounded bg-emerald-500 text-white font-bold text-[10px] tracking-wider uppercase shadow-2xs">
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px] tracking-wide uppercase">
                                   VERIFIED TEMPORAL SHIFT
                                 </span>
                               ) : (
-                                <span className="px-2.5 py-1 rounded bg-amber-500 text-white font-bold text-[10px] tracking-wider uppercase">
+                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px] tracking-wide uppercase">
                                   NO SIGNIFICANT SHIFT
                                 </span>
                               )}
-                              <span className="text-slate-600 text-xs font-bold">Estimated Delta:</span>
+                              <span className="text-slate-500 text-[11px]">Estimated Delta:</span>
                             </div>
-                            <span className="text-sm font-bold text-[#00A3A6]">
+                            <span className="font-mono font-bold text-[#00A3A6] text-sm">
                               {message.pixel_diff_percent == null ? 'N/A' : `${message.pixel_diff_percent}%`}
                             </span>
                           </motion.div>
@@ -585,6 +603,7 @@ export default function Analyse() {
                 attachedImagePreview={singleImagePreview}
                 onAttachImage={handleSingleImageChange}
                 onRemoveAttachment={handleRemoveSingleImage}
+                allowEmptySubmit={activeTab === 'spectral' && Boolean(spectralBands.red && spectralBands.nir)}
                 placeholder={
                   activeTab === 'grounding'
                     ? "Enter feature name or speak into mic (e.g. water body, settlement, runway)..."

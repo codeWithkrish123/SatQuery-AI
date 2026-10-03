@@ -14,11 +14,14 @@ export default function VoicePromptBar({
   placeholder = "Ask a question about this satellite scene, identify objects, or detect changes...",
   presets = [],
   onSelectPreset,
+  allowEmptySubmit = false,
 }) {
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
   const recognitionRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const canSubmit = !loading && (prompt.trim().length > 0 || allowEmptySubmit);
 
   // Initialize Web Speech API for voice dictation
   useEffect(() => {
@@ -97,7 +100,7 @@ export default function VoicePromptBar({
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!loading && (prompt.trim() || attachedImage)) {
+      if (canSubmit) {
         onSubmit(e);
       }
     }
@@ -210,9 +213,9 @@ export default function VoicePromptBar({
             <button
               type="button"
               onClick={onSubmit}
-              disabled={loading || (!prompt.trim() && !attachedImage)}
+              disabled={!canSubmit}
               className="flex items-center justify-center p-2 rounded-xl bg-[#00A3A6] text-white hover:bg-[#008C8F] disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xs hover:shadow-md hover:scale-105 active:scale-95"
-              title="Submit Query"
+              title={canSubmit ? "Submit Query" : "Type your query or speak into mic to submit"}
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

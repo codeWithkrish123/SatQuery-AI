@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Send, CheckCircle, Loader2, Scan, ArrowLeftRight, FileText, Sparkles, AlertCircle, ShieldAlert, Calendar, RotateCcw, Waves } from 'lucide-react';
+import { Upload, Send, CheckCircle, Loader2, Scan, ArrowLeftRight, FileText, Sparkles, AlertCircle, ShieldAlert, Calendar, RotateCcw, Waves, MapPin, Maximize2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import AIOrb from '../components/AIOrb';
+import StreamingResponse from '../components/StreamingResponse';
+import VoicePromptBar from '../components/VoicePromptBar';
 
 export default function Analyse() {
-  const [activeTab, setActiveTab] = useState('vqa'); // 'vqa' | 'change' | 'grounding'
+  const [activeTab, setActiveTab] = useState('vqa'); // 'vqa' | 'change' | 'grounding' | 'spectral'
   const [prompt, setPrompt] = useState('');
 
   // Single Image State (VQA & Grounding)
@@ -26,6 +29,7 @@ export default function Analyse() {
 
   // Grounding BBox Canvas Overlay Refs
   const groundingImageRef = useRef(null);
+  const chatScrollRef = useRef(null);
   const [renderedDimensions, setRenderedDimensions] = useState({ width: 0, height: 0 });
 
   const [loading, setLoading] = useState(false);
@@ -43,8 +47,19 @@ export default function Analyse() {
   const presets = [
     "Identify water reservoir boundary and flood risk",
     "Describe flooded terrain and crop damage index",
-    "Quantify coastal shoreline erosion shift"
+    "Quantify coastal shoreline erosion shift",
+    "Locate road networks crossing waterways"
   ];
+
+  // Auto-scroll chat thread smoothly when new messages stream in
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTo({
+        top: chatScrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [messages, loading]);
 
   // Dynamically track rendered image width & height for grounding canvas overlay
   useEffect(() => {
@@ -62,12 +77,16 @@ export default function Analyse() {
     return () => window.removeEventListener('resize', updateDimensions);
   }, [singleImagePreview, activeTab]);
 
-  const handleSingleImageChange = (e) => {
-    const file = e.target.files[0];
+  const handleSingleImageChange = (file) => {
     if (file) {
       setSingleImage(file);
       setSingleImagePreview(URL.createObjectURL(file));
     }
+  };
+
+  const handleRemoveSingleImage = () => {
+    setSingleImage(null);
+    setSingleImagePreview(null);
   };
 
   const handleSpectralBandChange = (band, event) => {
@@ -78,21 +97,28 @@ export default function Analyse() {
   const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://satquery-backend-sandy.vercel.app').split(',')[0].trim().replace(/\/+$/, '');
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (loading) return;
 
-    const submittedText = activeTab === 'grounding'
-      ? featureName || 'water body'
+    const queryText = activeTab === 'grounding'
+      ? (prompt.trim() || featureName || 'water body')
       : activeTab === 'spectral'
         ? 'Calculate NDVI and NDWI from uploaded spectral bands'
-        : prompt || (activeTab === 'change' ? 'Quantify shoreline delta' : 'Describe satellite scene features');
+        : prompt.trim() || (activeTab === 'change' ? 'Quantify shoreline delta' : 'Describe satellite scene features');
 
+    if (activeTab === 'grounding') {
+      setFeatureName(queryText);
+    }
+
+    // Add user message to conversational thread
     setMessages((current) => [...current, {
       id: `user-${Date.now()}`,
       role: 'user',
-      text: submittedText,
-      image: singleImagePreview,
+      text: queryText,
+      image: (activeTab === 'vqa' || activeTab === 'grounding') ? singleImagePreview : null,
+      tab: activeTab
     }]);
+
     setLoading(true);
     setAiState('processing');
     setResponse(null);
@@ -105,13 +131,13 @@ export default function Analyse() {
 
       if (activeTab === 'vqa') {
         endpoint = `${API_BASE_URL}/api/vqa`;
-        formData.append('question', prompt || 'Describe satellite scene features');
+        formData.append('question', queryText);
         if (singleImage) formData.append('image', singleImage);
 
         res = await fetch(endpoint, { method: 'POST', body: formData });
       } else if (activeTab === 'change') {
         endpoint = `${API_BASE_URL}/api/change-detection`;
-        formData.append('question', prompt || 'Quantify shoreline delta');
+        formData.append('question', queryText);
         formData.append('date1', date1);
         formData.append('date2', date2);
         if (image1) formData.append('image1', image1);
@@ -120,7 +146,7 @@ export default function Analyse() {
         res = await fetch(endpoint, { method: 'POST', body: formData });
       } else if (activeTab === 'grounding') {
         endpoint = `${API_BASE_URL}/api/grounding`;
-        formData.append('feature', featureName || 'water body');
+        formData.append('feature', queryText);
         if (singleImage) formData.append('image', singleImage);
 
         res = await fetch(endpoint, { method: 'POST', body: formData });
@@ -137,13 +163,24 @@ export default function Analyse() {
         const data = await res.json();
         setResponse(data);
         setAiState('success');
+
+        const answerText = data.answer || data.raw_response || 'Analysis complete. Review the verified evidence below.';
+
         setMessages((current) => [...current, {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          text: data.answer || data.raw_response || 'Spectral analysis complete. Review the calculated indices below.',
+          text: answerText,
           sources: data.sources,
           evidence: data.evidence,
+          model: data.source ? data.source.split('(')[0].trim() : 'Google Gemini 1.5 Flash',
+          live_model: data.live_model !== false,
+          bbox: data.bbox_percent || data.bounding_box,
+          verified_change: data.verified_change,
+          pixel_diff_percent: data.pixel_diff_percent,
         }]);
+
+        // Clear prompt input after submission for clean conversational flow
+        setPrompt('');
       } else {
         let message = 'API server returned an error';
         if (res) {
@@ -158,16 +195,14 @@ export default function Analyse() {
       }
     } catch (err) {
       const errorMsg = err.message || 'Request failed. Analysis unavailable.';
-      const errorResponse = {
-        error: errorMsg
-      };
-      setResponse(errorResponse);
+      setResponse({ error: errorMsg });
       setAiState('error');
       setMessages((current) => [...current, {
         id: `assistant-error-${Date.now()}`,
         role: 'assistant',
-        text: `⚠️ Analysis Unavailable: ${errorMsg}\nNo mock or synthetic result was generated. Please verify the live model service endpoint connection.`,
-        isError: true
+        text: `⚠️ Analysis Unavailable: ${errorMsg}\nPlease verify that your Gemini API key or backend endpoint is active.`,
+        isError: true,
+        model: 'SatQuery Vision Core'
       }]);
     } finally {
       setLoading(false);
@@ -190,18 +225,18 @@ export default function Analyse() {
             Analyse a Scene
           </h1>
           <p className="text-sm text-slate-600">
-            Visual Q&A, Grounding overlay canvas, and verified Change Detection.
+            Multimodal Earth Observation: Voice Dictation, Spatial Grounding, and Temporal Change Detection.
           </p>
         </div>
 
         <div className="flex items-center space-x-2 font-mono text-xs text-[#00A3A6]">
           <span className="w-2 h-2 rounded-full bg-[#00A3A6] animate-pulse"></span>
-          <span>SIH CONTRACT READY</span>
+          <span>GEMINI CLOUD VISION · 24/7 LIVE</span>
         </div>
       </div>
 
       {/* Mode Tabs */}
-      <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4 font-mono">
+      <div className="flex flex-wrap gap-2.5 border-b border-slate-200 pb-4 font-mono">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -211,13 +246,16 @@ export default function Analyse() {
                 setActiveTab(tab.id);
                 setResponse(null);
               }}
-              className={`flex items-center space-x-2 px-4 py-2 rounded text-xs transition-all ${isActive
-                  ? 'border-b-2 border-[#00A3A6] text-[#00A3A6] font-bold bg-[#E6F4F1]'
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                isActive
+                  ? 'border border-[#00A3A6]/40 text-[#00A3A6] font-bold bg-[#E6F4F1] shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
+              }`}
             >
               <span>{tab.label}</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded border border-[#00A3A6]/30 text-[#00A3A6] font-bold">
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                isActive ? 'bg-[#00A3A6] text-white' : 'border border-[#00A3A6]/30 text-[#00A3A6]'
+              }`}>
                 [{tab.tag}]
               </span>
             </button>
@@ -228,12 +266,25 @@ export default function Analyse() {
       {/* Analysis Interface Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Upload Container */}
-        <div className="glass-panel space-y-4 p-6 lg:col-span-6">
-          <p className="text-[10px] font-mono text-slate-400 tracking-wider uppercase">IMAGE INPUT</p>
+        <div className="glass-panel space-y-4 p-6 lg:col-span-6 rounded-3xl border border-slate-200/90 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-mono text-slate-400 tracking-wider uppercase font-semibold">
+              IMAGE TELEMETRY INPUT
+            </p>
+            {singleImagePreview && (
+              <button
+                type="button"
+                onClick={handleRemoveSingleImage}
+                className="text-[10px] font-mono text-rose-500 hover:underline"
+              >
+                Clear Scene
+              </button>
+            )}
+          </div>
 
           {activeTab === 'spectral' ? (
             <div className="space-y-4">
-              <div className="rounded-lg border border-[#00A3A6]/30 bg-[#EAF8FA] p-3 text-[11px] leading-relaxed text-slate-600">
+              <div className="rounded-xl border border-[#00A3A6]/30 bg-[#EAF8FA] p-3 text-[11px] leading-relaxed text-slate-600 font-mono">
                 Upload aligned single-band files. Red + NIR calculate NDVI; Green + NIR additionally calculate NDWI water candidates.
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -242,25 +293,25 @@ export default function Analyse() {
                   ['nir', 'NIR · B8', 'Required'],
                   ['green', 'GREEN · B3', 'Optional'],
                 ].map(([band, label, requirement]) => (
-                  <label key={band} className="relative flex min-h-32 cursor-pointer flex-col justify-between border border-dashed border-[#00A3A6] bg-[#F8FAFC] p-3 transition-colors hover:bg-[#EAF8FA]">
+                  <label key={band} className="relative flex min-h-32 cursor-pointer flex-col justify-between border border-dashed border-[#00A3A6] bg-[#F8FAFC] p-3.5 rounded-2xl transition-all hover:bg-[#EAF8FA] hover:border-[#00A3A6]">
                     <input type="file" accept="image/*,.tif,.tiff" onChange={(event) => handleSpectralBandChange(band, event)} className="absolute inset-0 cursor-pointer opacity-0" />
                     <span className="font-mono text-[10px] font-bold text-[#087D86]">{label}</span>
-                    <span className="text-[10px] text-slate-500">{spectralBands[band]?.name || requirement}</span>
+                    <span className="text-[10px] text-slate-500 truncate">{spectralBands[band]?.name || requirement}</span>
                     <Upload className="h-4 w-4 text-[#00A3A6]" />
                   </label>
                 ))}
               </div>
             </div>
           ) : (activeTab === 'vqa' || activeTab === 'grounding') ? (
-            <div className={`relative flex min-h-[260px] flex-col items-center justify-center border border-dashed border-[#00A3A6] bg-[#EAF8FA] p-4 text-center transition-colors hover:bg-[#E4F5F7] ${loading && singleImagePreview ? 'ai-image-processing' : ''}`}>
+            <div className={`relative flex min-h-[290px] flex-col items-center justify-center border-2 border-dashed border-[#00A3A6]/40 bg-[#F8FAFC] p-4 text-center rounded-2xl transition-all hover:bg-[#EAF8FA]/60 ${loading && singleImagePreview ? 'ai-image-processing ring-4 ring-[#00A3A6]/20' : ''}`}>
               <input
                 type="file"
-                accept="image/*"
-                onChange={handleSingleImageChange}
+                accept="image/*,.tif,.tiff"
+                onChange={(e) => handleSingleImageChange(e.target.files[0])}
                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-20"
               />
               {singleImagePreview ? (
-                <div className="relative w-full overflow-hidden rounded-lg flex justify-center">
+                <div className="relative w-full overflow-hidden rounded-xl flex justify-center bg-black/5">
                   <img
                     ref={groundingImageRef}
                     onLoad={() => {
@@ -273,19 +324,22 @@ export default function Analyse() {
                     }}
                     src={singleImagePreview}
                     alt="Satellite Preview"
-                    className="max-h-72 w-full object-contain rounded-lg"
+                    className="max-h-80 w-full object-contain rounded-xl shadow-xs"
                   />
 
                   {loading && (
-                    <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 border border-[#9BDDE2] bg-white/90 px-2.5 py-1.5 font-mono text-[10px] font-bold text-[#087D86] shadow-sm backdrop-blur-sm">
-                      <Loader2 className="h-3 w-3 animate-spin" /> VISUAL PROCESSING
+                    <div className="absolute bottom-3 left-3 z-30 flex items-center gap-2 border border-[#9BDDE2] bg-white/95 px-3 py-1.5 font-mono text-[10px] font-bold text-[#087D86] rounded-xl shadow-md backdrop-blur-md animate-pulse">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-[#00A3A6]" /> MULTIMODAL REASONING...
                     </div>
                   )}
 
                   {/* Grounding BBox Percentage Canvas Overlay (SIH Contract: 0-100% converted to displayed pixels) */}
                   {activeTab === 'grounding' && response && response.bbox_percent && (
-                    <div
-                      className="absolute border-2 border-[#00A3A6] bg-[#00A3A6]/20 flex items-start p-1 z-30 shadow-[0_0_15px_rgba(0,163,166,0.4)]"
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.4 }}
+                      className="absolute border-2 border-[#00A3A6] bg-[#00A3A6]/25 flex items-start p-1 z-30 shadow-[0_0_20px_rgba(0,163,166,0.6)] rounded-sm"
                       style={{
                         left: `${(response.bbox_percent[0] / 100) * renderedDimensions.width}px`,
                         top: `${(response.bbox_percent[1] / 100) * renderedDimensions.height}px`,
@@ -293,22 +347,25 @@ export default function Analyse() {
                         height: `${((response.bbox_percent[3] - response.bbox_percent[1]) / 100) * renderedDimensions.height}px`,
                       }}
                     >
-                      <span className="text-[10px] font-mono bg-[#00A3A6] text-white px-1.5 py-0.5 rounded font-bold">
+                      <span className="text-[10px] font-mono bg-[#00A3A6] text-white px-2 py-0.5 rounded font-bold shadow-xs flex items-center gap-1">
+                        <MapPin className="w-2.5 h-2.5" />
                         {featureName || 'Target Feature'}
                       </span>
-                    </div>
+                    </motion.div>
                   )}
                 </div>
               ) : (
-                <div className="space-y-3 font-mono">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-[#9BDDE2] bg-white text-[#00A3A6]">
-                    <Upload className="w-6 h-6" />
+                <div className="space-y-3 font-mono py-6">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[#9BDDE2] bg-[#E6F4F1] text-[#00A3A6] shadow-xs">
+                    <Upload className="w-6 h-6 animate-pulse" />
                   </div>
                   <div>
-                    <h4 className="font-sans text-base font-bold text-slate-900">Upload satellite imagery</h4>
+                    <h4 className="font-sans text-sm font-bold text-slate-900">Upload Satellite Tile</h4>
                     <p className="mt-1 text-[10px] text-slate-400">PNG · JPG · GEOTIFF UP TO 50 MB</p>
                   </div>
-                  <p className="text-[11px] font-bold uppercase text-[#00A3A6]">DROP OR CLICK TO BROWSE</p>
+                  <p className="text-[11px] font-bold uppercase text-[#00A3A6] tracking-wide">
+                    CLICK OR DRAG IMAGE HERE
+                  </p>
                 </div>
               )}
             </div>
@@ -318,49 +375,49 @@ export default function Analyse() {
               <div className="grid grid-cols-2 gap-4 font-mono">
                 {/* Image 1 Slot */}
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center text-[10px] text-slate-500">
-                    <span>BEFORE SCENE</span>
+                  <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold">
+                    <span>BASELINE (T1)</span>
                     <Calendar className="w-3 h-3 text-[#00A3A6]" />
                   </div>
-                  <div className="border border-slate-200 rounded-xl p-2 bg-[#F8FAFC] relative h-40 flex items-center justify-center overflow-hidden">
+                  <div className="border border-slate-200 rounded-2xl p-2 bg-[#F8FAFC] relative h-40 flex items-center justify-center overflow-hidden hover:border-[#00A3A6] transition-colors">
                     <input type="file" accept="image/*" onChange={(e) => {
                       if (e.target.files[0]) {
                         setImage1(e.target.files[0]);
                         setImage1Preview(URL.createObjectURL(e.target.files[0]));
                       }
                     }} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                    <img src={image1Preview} alt="Before" className="w-full h-full object-cover rounded-lg" />
+                    <img src={image1Preview} alt="Before" className="w-full h-full object-cover rounded-xl" />
                   </div>
                   <input
                     type="text"
                     value={date1}
                     onChange={(e) => setDate1(e.target.value)}
                     placeholder="14 August 2026"
-                    className="w-full px-3 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded text-xs text-slate-800 font-mono focus:outline-none focus:border-[#00A3A6]"
+                    className="w-full px-3 py-2 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-[#00A3A6]"
                   />
                 </div>
 
                 {/* Image 2 Slot */}
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center text-[10px] text-slate-500">
-                    <span>AFTER SCENE</span>
+                  <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold">
+                    <span>CURRENT (T2)</span>
                     <Calendar className="w-3 h-3 text-[#00A3A6]" />
                   </div>
-                  <div className="border border-slate-200 rounded-xl p-2 bg-[#F8FAFC] relative h-40 flex items-center justify-center overflow-hidden">
+                  <div className="border border-slate-200 rounded-2xl p-2 bg-[#F8FAFC] relative h-40 flex items-center justify-center overflow-hidden hover:border-[#00A3A6] transition-colors">
                     <input type="file" accept="image/*" onChange={(e) => {
                       if (e.target.files[0]) {
                         setImage2(e.target.files[0]);
                         setImage2Preview(URL.createObjectURL(e.target.files[0]));
                       }
                     }} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                    <img src={image2Preview} alt="After" className="w-full h-full object-cover rounded-lg" />
+                    <img src={image2Preview} alt="After" className="w-full h-full object-cover rounded-xl" />
                   </div>
                   <input
                     type="text"
                     value={date2}
                     onChange={(e) => setDate2(e.target.value)}
                     placeholder="12 September 2026"
-                    className="w-full px-3 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded text-xs text-slate-800 font-mono focus:outline-none focus:border-[#00A3A6]"
+                    className="w-full px-3 py-2 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs text-slate-800 font-mono focus:outline-none focus:border-[#00A3A6]"
                   />
                 </div>
               </div>
@@ -368,199 +425,178 @@ export default function Analyse() {
           )}
         </div>
 
-        {/* Right Query & Response Section */}
+        {/* Right Query & Interactive Conversational Intelligence Section */}
         <div className="space-y-6 lg:col-span-6">
-          <div className="glass-panel space-y-4 p-6 font-mono">
-            <div className="space-y-3 border-b border-slate-200 pb-4" aria-live="polite">
+          <div className="glass-panel space-y-5 p-6 font-mono rounded-3xl border border-slate-200/90 shadow-sm flex flex-col min-h-[580px]">
+            {/* Conversation Messages Container */}
+            <div
+              ref={chatScrollRef}
+              className="flex-1 overflow-y-auto space-y-4 pr-1 max-h-[460px] scroll-smooth"
+              aria-live="polite"
+            >
               {messages.length === 0 && (
-                <div className="flex items-center gap-3 text-xs text-slate-500">
-                  <AIOrb state="idle" compact />
-                  <span>Ready for a grounded satellite analysis.</span>
+                <div className="flex flex-col items-center justify-center text-center py-16 px-4 space-y-3">
+                  <AIOrb state="idle" />
+                  <div className="space-y-1">
+                    <h3 className="font-sans font-bold text-slate-800 text-sm">
+                      SatQuery Multimodal Intelligence
+                    </h3>
+                    <p className="text-xs text-slate-500 font-mono max-w-sm">
+                      Upload an image, type your question, or tap the microphone to speak your query.
+                    </p>
+                  </div>
                 </div>
               )}
 
+              {/* Message Thread */}
               {messages.map((message) => (
-                <div key={message.id} className={`ai-message-enter flex gap-3 ${message.role === 'user' ? 'justify-end' : 'items-start'}`}>
-                  {message.role === 'assistant' && <AIOrb state={message.isError ? 'error' : 'success'} compact />}
-                  <div className={`max-w-[88%] px-3.5 py-3 text-xs leading-relaxed ${message.role === 'user'
-                      ? 'bg-[#102838] text-white rounded'
-                      : message.isError
-                        ? 'border-l-4 border-amber-500 bg-amber-50 text-amber-900 font-mono rounded'
-                        : 'border-l-2 border-[#00A3A6] bg-[#EAF8FA] text-slate-700'
-                    }`}>
-                    {message.image && (
-                      <img src={message.image} alt="Uploaded satellite scene" className="mb-2 max-h-28 w-full object-cover" />
-                    )}
-                    <p className="whitespace-pre-wrap">{message.text}</p>
-                    {message.sources && message.sources.length > 0 && !message.isError && (
-                      <div className="mt-2.5 pt-2 border-t border-[#00A3A6]/20 space-y-1 font-mono text-[10px]">
-                        <span className="font-bold text-[#00A3A6]">// GROUNDED CATALOG SOURCES:</span>
-                        <div className="flex flex-wrap gap-1.5 mt-1">
-                          {message.sources.map((src, i) => (
-                            <a key={i} href={src.url || '#'} target="_blank" rel="noopener noreferrer" className="px-2 py-0.5 rounded bg-[#00A3A6]/10 text-[#00A3A6] border border-[#00A3A6]/30 hover:bg-[#00A3A6] hover:text-white transition-colors">
-                              🔗 {src.title || src.source_id}
-                            </a>
-                          ))}
-                        </div>
+                <div key={message.id} className="space-y-2">
+                  {message.role === 'user' ? (
+                    /* User Message Bubble */
+                    <div className="flex justify-end">
+                      <div className="max-w-[85%] rounded-2xl bg-[#102838] text-white px-4 py-3 text-xs leading-relaxed shadow-xs">
+                        {message.image && (
+                          <div className="mb-2 rounded-xl overflow-hidden border border-white/20">
+                            <img src={message.image} alt="User Scene Tile" className="max-h-36 w-full object-cover" />
+                          </div>
+                        )}
+                        <p className="font-sans">{message.text}</p>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    /* Assistant Message with GPT/Claude/Gemini Typewriter & Motion */
+                    <div className="flex items-start gap-2.5">
+                      <div className="shrink-0 mt-1">
+                        <AIOrb state={message.isError ? 'error' : 'success'} compact />
+                      </div>
+                      <div className="flex-1 space-y-3">
+                        <StreamingResponse
+                          text={message.text}
+                          sources={message.sources}
+                          model={message.model || 'Gemini Flash Vision'}
+                          isError={message.isError}
+                          isLive={message.live_model}
+                        />
+
+                        {/* Visual Badge Card for Grounding Coordinates if available */}
+                        {message.bbox && Array.isArray(message.bbox) && message.bbox.length === 4 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center gap-2 p-2.5 rounded-xl bg-[#E6F4F1] border border-[#00A3A6]/30 text-xs font-mono text-[#087D86]"
+                          >
+                            <Scan className="w-4 h-4 text-[#00A3A6]" />
+                            <span className="font-bold">BOUNDING BOX OVERLAY:</span>
+                            <span className="bg-white px-2 py-0.5 rounded border border-[#00A3A6]/20 font-bold">
+                              [{message.bbox.join(', ')}]%
+                            </span>
+                          </motion.div>
+                        )}
+
+                        {/* Visual Badge Card for Change Detection if available */}
+                        {message.verified_change !== undefined && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center justify-between p-3 rounded-xl bg-[#E6F4F1] border border-[#00A3A6]/30 font-mono text-xs"
+                          >
+                            <div className="flex items-center space-x-2">
+                              {message.verified_change ? (
+                                <span className="px-2.5 py-1 rounded bg-emerald-500 text-white font-bold text-[10px] tracking-wider uppercase shadow-2xs">
+                                  VERIFIED TEMPORAL SHIFT
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded bg-amber-500 text-white font-bold text-[10px] tracking-wider uppercase">
+                                  NO SIGNIFICANT SHIFT
+                                </span>
+                              )}
+                              <span className="text-slate-600 text-xs font-bold">Estimated Delta:</span>
+                            </div>
+                            <span className="text-sm font-bold text-[#00A3A6]">
+                              {message.pixel_diff_percent == null ? 'N/A' : `${message.pixel_diff_percent}%`}
+                            </span>
+                          </motion.div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
+              {/* Live Loading Indicator with AI Orb */}
               {loading && (
-                <div className="ai-message-enter flex items-center gap-3 border-l-2 border-[#00A3A6] bg-[#EAF8FA] px-3 py-3 text-xs text-slate-600">
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 rounded-2xl border border-[#00A3A6]/30 bg-[#E6F4F1] px-4 py-3 text-xs text-[#087D86] font-mono shadow-2xs"
+                >
                   <AIOrb state="processing" compact />
-                  <span>Reviewing scene evidence and preparing a grounded response<span className="ai-caret" /></span>
-                </div>
+                  <span className="flex items-center gap-1.5 font-bold">
+                    Analyzing satellite telemetry via Gemini Vision Core
+                    <span className="flex gap-0.5">
+                      <span className="w-1 h-1 rounded-full bg-[#00A3A6] animate-ping" />
+                    </span>
+                  </span>
+                </motion.div>
               )}
             </div>
 
-            <p className="text-[10px] text-slate-400 tracking-wider uppercase">
-              {activeTab === 'grounding' ? 'FEATURE NAME INPUT' : activeTab === 'spectral' ? 'SPECTRAL INPUT' : 'QUESTION INPUT'}
-            </p>
-
-            {activeTab === 'spectral' ? (
-              <form onSubmit={handleSubmit}>
-                <button type="submit" disabled={loading || !spectralBands.red || !spectralBands.nir} className="mission-button flex w-full items-center justify-center gap-2 bg-[#00A3A6] px-5 py-3 text-xs font-bold text-white transition-all hover:bg-[#008C8F] disabled:cursor-not-allowed disabled:opacity-50">
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Waves className="h-4 w-4" /> CALCULATE INDICES &gt;</>}
+            {/* Error Notification Banner with Retry */}
+            {response && response.error && (
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-950 font-mono">
+                <div>
+                  <p className="font-bold">// SERVICE TELEMETRY NOTICE</p>
+                  <p className="mt-0.5 text-amber-800">{response.error}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  className="flex shrink-0 items-center gap-1.5 border border-amber-400 bg-white px-3 py-1.5 rounded-xl font-mono text-[10px] font-bold text-amber-900 hover:bg-amber-100 transition-colors shadow-2xs"
+                >
+                  <RotateCcw className="h-3 w-3" /> RETRY
                 </button>
-              </form>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-3">
-                {activeTab === 'grounding' ? (
-                  <div className="flex border border-slate-200 rounded-xl overflow-hidden focus-within:border-[#00A3A6] bg-[#F8FAFC]">
-                    <input
-                      type="text"
-                      value={featureName}
-                      onChange={(e) => setFeatureName(e.target.value)}
-                      placeholder="e.g. water body, solar panel, bridge..."
-                      className="flex-1 px-4 py-3 bg-transparent text-xs text-slate-900 focus:outline-none font-mono"
-                    />
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="mission-button px-5 bg-[#00A3A6] hover:bg-[#008C8F] text-white text-xs font-bold transition-all disabled:opacity-50"
-                    >
-                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>LOCATE &gt;</span>}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex border border-slate-200 rounded-xl overflow-hidden focus-within:border-[#00A3A6] bg-[#F8FAFC]">
-                      <input
-                        type="text"
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        placeholder="Ask a question or enter change query..."
-                        className="flex-1 px-4 py-3 bg-transparent text-xs text-slate-900 focus:outline-none font-mono"
-                      />
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="mission-button px-5 bg-[#00A3A6] hover:bg-[#008C8F] text-white text-xs font-bold transition-all disabled:opacity-50"
-                      >
-                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>SUBMIT &gt;</span>}
-                      </button>
-                    </div>
-
-                    {/* Preset Question Buttons */}
-                    {activeTab === 'vqa' && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {presets.map((preset, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setPrompt(preset)}
-                            className="px-2.5 py-1 rounded bg-[#E6F4F1] border border-[#00A3A6]/30 text-[#00A3A6] text-[10px] hover:bg-[#00A3A6] hover:text-white transition-colors"
-                          >
-                            + {preset}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </form>
-            )}
-
-            {/* Results Display Panel matching exact SIH contract */}
-            {response && (
-              <div className="space-y-4 pt-2">
-                {response.error && (
-                  <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">
-                    <div>
-                      <p className="font-bold">// LIVE MODEL UNAVAILABLE</p>
-                      <p className="mt-1">{response.error}</p>
-                    </div>
-                    <button type="button" onClick={handleRetry} className="flex shrink-0 items-center gap-1.5 border border-amber-400 bg-white px-3 py-2 font-mono text-[10px] font-bold text-amber-800 transition-colors hover:bg-amber-100">
-                      <RotateCcw className="h-3 w-3" /> RETRY
-                    </button>
-                  </div>
-                )}
-                {/* Grounding Null Case: Feature Not Found */}
-                {activeTab === 'grounding' && response.bbox_percent === null && (
-                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-center space-x-3">
-                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-                    <div>
-                      <p className="font-bold text-amber-950">// FEATURE NOT FOUND IN SCENE</p>
-                      <p className="text-[11px] text-amber-800 mt-0.5">Could not locate "{featureName}" in the uploaded satellite image tile.</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Change Detection Badge (Green "Verified Change" vs Amber "No Significant Change") ABOVE answer text */}
-                {activeTab === 'change' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-[#E6F4F1] border border-[#00A3A6]/30 font-mono">
-                      <div className="flex items-center space-x-2">
-                        {response.verified_change === null ? (
-                          <span className="px-2.5 py-1 rounded bg-slate-500 text-white font-bold text-[10px] tracking-wider uppercase">
-                            MODEL METRIC UNAVAILABLE
-                          </span>
-                        ) : response.verified_change ? (
-                          <span className="px-2.5 py-1 rounded bg-emerald-500 text-white font-bold text-[10px] tracking-wider uppercase">
-                            VERIFIED CHANGE
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded bg-amber-500 text-white font-bold text-[10px] tracking-wider uppercase">
-                            NO SIGNIFICANT CHANGE
-                          </span>
-                        )}
-                        <span className="text-slate-600 text-xs">Deterministic Pixel Diff:</span>
-                      </div>
-                      <span className="text-sm font-bold text-[#00A3A6]">
-                        {response.pixel_diff_percent == null ? 'N/A' : `${response.pixel_diff_percent}%`}
-                      </span>
-                    </div>
-
-                    {/* Secondary Raw Model Answer expandable/subtle display */}
-                    {response.raw_model_answer && (
-                      <div className="p-2.5 rounded bg-slate-50 border border-slate-200 text-[11px] text-slate-500 font-mono">
-                        <span className="font-semibold text-slate-700">// RAW MODEL CLAIM:</span> {response.raw_model_answer}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {activeTab === 'spectral' && !response.error && (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {[
-                      ['NDVI mean', response.ndvi_mean == null ? 'N/A' : response.ndvi_mean],
-                      ['NDWI mean', response.ndwi_mean == null ? 'N/A' : response.ndwi_mean],
-                      ['Water candidates', response.water_candidate_percent == null ? 'N/A' : `${response.water_candidate_percent}%`],
-                      ['Flood candidates', response.flood_candidate_percent == null ? 'N/A' : `${response.flood_candidate_percent}%`],
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded-xl border border-[#00A3A6]/30 bg-[#E6F4F1] p-3">
-                        <p className="font-mono text-[9px] uppercase tracking-wide text-slate-500">{label}</p>
-                        <p className="mt-1 font-serif text-xl text-[#087D86]">{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
               </div>
             )}
+
+            {/* Spectral Result Tiles (if on spectral tab) */}
+            {activeTab === 'spectral' && response && !response.error && (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 pt-2">
+                {[
+                  ['NDVI mean', response.ndvi_mean == null ? 'N/A' : response.ndvi_mean],
+                  ['NDWI mean', response.ndwi_mean == null ? 'N/A' : response.ndwi_mean],
+                  ['Water candidates', response.water_candidate_percent == null ? 'N/A' : `${response.water_candidate_percent}%`],
+                  ['Flood candidates', response.flood_candidate_percent == null ? 'N/A' : `${response.flood_candidate_percent}%`],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-2xl border border-[#00A3A6]/30 bg-[#E6F4F1] p-3 text-center">
+                    <p className="font-mono text-[9px] uppercase tracking-wide text-slate-500 font-bold">{label}</p>
+                    <p className="mt-1 font-serif text-lg font-bold text-[#087D86]">{value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Interactive GPT/Claude/Gemini Voice & Multimodal Prompt Input Bar */}
+            <div className="pt-2 border-t border-slate-200/80">
+              <VoicePromptBar
+                prompt={prompt}
+                setPrompt={setPrompt}
+                onSubmit={handleSubmit}
+                loading={loading}
+                attachedImage={singleImage}
+                attachedImagePreview={singleImagePreview}
+                onAttachImage={handleSingleImageChange}
+                onRemoveAttachment={handleRemoveSingleImage}
+                placeholder={
+                  activeTab === 'grounding'
+                    ? "Enter feature name or speak into mic (e.g. water body, settlement, runway)..."
+                    : activeTab === 'change'
+                      ? "Enter bi-temporal change query (or click mic to speak)..."
+                      : "Ask any question about this satellite scene (or click mic to speak)..."
+                }
+                presets={activeTab === 'vqa' ? presets : []}
+                onSelectPreset={(preset) => setPrompt(preset)}
+              />
+            </div>
           </div>
         </div>
       </div>

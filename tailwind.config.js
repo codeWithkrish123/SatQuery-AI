@@ -17,6 +17,7 @@ export default {
         slateDark: "#0F172A",
       },
       fontFamily: {
+        display: ['Syne', '"Space Grotesk"', 'sans-serif'],
         serif: ['"Playfair Display"', '"Instrument Serif"', 'Georgia', 'serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
         sans: ['Inter', 'sans-serif'],

@@ -11,13 +11,15 @@ export default function Scenes() {
   const [newSatellite, setNewSatellite] = useState('LISS-IV / EOS-04');
   const [newType, setNewType] = useState('LISS-IV');
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://satquery-backend-sandy.vercel.app';
+
   useEffect(() => {
     fetchScenes();
   }, [filter, search]);
 
   const fetchScenes = async () => {
     try {
-      const url = `/api/scenes?category=${filter}&search=${search}`;
+      const url = `${API_BASE_URL}/api/scenes?category=${filter}&search=${search}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.scenes) setScenes(data.scenes);
@@ -34,7 +36,7 @@ export default function Scenes() {
     formData.append('type', newType);
 
     try {
-      const res = await fetch('/api/scenes/upload', {
+      const res = await fetch(`${API_BASE_URL}/api/scenes/upload`, {
         method: 'POST',
         body: formData
       });
@@ -52,21 +54,21 @@ export default function Scenes() {
   const categories = ['All', 'Optical', 'SAR', 'LISS-IV', 'Cartosat'];
 
   return (
-    <div className="p-6 md:p-10 space-y-8 max-w-7xl mx-auto font-sans bg-[#F8FAFC]">
+    <div className="aerospace-page mx-auto max-w-7xl space-y-8 p-6 font-sans md:p-10">
       {/* Header Matching Screenshot 1 */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
-          <p className="text-xs font-mono text-[#00A3A6] tracking-wider uppercase font-semibold">
+          <p className="mission-label">
             // IMAGERY INVENTORY
           </p>
-          <h1 className="text-4xl md:text-5xl font-serif font-normal text-slate-900 mt-1">
+          <h1 className="mt-1 font-serif text-4xl font-normal tracking-tight text-slate-900 md:text-5xl">
             Scene library
           </h1>
         </div>
 
         <button
           onClick={() => setShowUploadModal(true)}
-          className="px-5 py-2.5 rounded bg-[#00A3A6] hover:bg-[#008C8F] text-white font-mono font-bold text-xs flex items-center space-x-2 transition-all shadow-sm"
+          className="mission-button flex items-center space-x-2 bg-[#00A3A6] px-5 py-3 font-mono text-xs font-bold text-white"
         >
           <Plus className="w-4 h-4" />
           <span>+ Upload scene</span>
@@ -82,11 +84,11 @@ export default function Scenes() {
               onClick={() => setFilter(cat)}
               className={`px-3.5 py-1.5 rounded border text-xs transition-all ${
                 filter === cat
-                  ? 'bg-[#E6F4F1] border-[#00A3A6] text-[#00A3A6] font-bold'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  ? 'border-[#00A3A6] bg-[#E6F4F1] font-bold text-[#00A3A6]'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-[#00A3A6] hover:bg-slate-50'
               }`}
             >
-              {cat === 'All' ? 'All assets · 36' : cat}
+              {cat === 'All' ? `All assets · ${scenes.length}` : cat}
             </button>
           ))}
         </div>
@@ -106,7 +108,7 @@ export default function Scenes() {
       {/* Scene Grid Matching Screenshot 1 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-mono">
         {scenes.map((scene) => (
-          <div key={scene.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
+          <div key={scene.id} className="glass-card overflow-hidden">
             {/* Asset Code & Green Dot */}
             <div className="p-3.5 border-b border-slate-100 flex items-center justify-between text-xs">
               <span className="text-[#00A3A6] text-[11px] font-semibold">{scene.id}</span>
@@ -133,7 +135,7 @@ export default function Scenes() {
       {/* Upload Modal */}
       {showUploadModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 font-mono">
-          <div className="bg-white border border-slate-200 rounded-xl w-full max-w-md p-6 space-y-5 relative shadow-xl">
+          <div className="glass-panel relative w-full max-w-md space-y-5 p-6 shadow-xl">
             <button onClick={() => setShowUploadModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-800">
               <X className="w-5 h-5" />
             </button>

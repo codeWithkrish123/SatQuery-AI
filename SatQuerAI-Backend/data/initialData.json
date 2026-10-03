@@ -108,50 +108,5 @@
       "Bi-temporal change detection verified chronology integrity without hallucination."
     ]
   },
-  "archive": [
-    {
-      "id": "QRY-9812",
-      "query": "Quantify shoreline shift in Brahmaputra lower bank",
-      "scene": "Brahmaputra floodplain inundation",
-      "location": "Assam, India (26.14° N, 91.73° E)",
-      "satellite": "Cartosat-3 / RISAT-1A",
-      "acquired": "12 SEP 2026",
-      "confidence": 98.4,
-      "mode": "Change Detection",
-      "status": "Completed"
-    },
-    {
-      "id": "QRY-9811",
-      "query": "Detect and ground solar panel arrays in Thar quadrant",
-      "scene": "Thar desert solar park expansion",
-      "location": "Rajasthan, India (27.02° N, 71.91° E)",
-      "satellite": "Cartosat-3",
-      "acquired": "28 AUG 2026",
-      "confidence": 99.4,
-      "mode": "Grounding",
-      "status": "Completed"
-    },
-    {
-      "id": "QRY-9810",
-      "query": "Optical-SAR cross-modal fusion for cloud-covered coastal zone",
-      "scene": "Kutch coastal corridor tidal shift",
-      "location": "Gujarat, India (23.73° N, 69.85° E)",
-      "satellite": "Sentinel-1 / RISAT-1",
-      "acquired": "09 SEP 2026",
-      "confidence": 97.6,
-      "mode": "Optical-SAR Fusion",
-      "status": "Completed"
-    },
-    {
-      "id": "QRY-9809",
-      "query": "Identify glacial lake outburst hazard boundaries",
-      "scene": "Nubra Valley glacial runoff",
-      "location": "Ladakh, India (34.68° N, 77.56° E)",
-      "satellite": "LISS-IV",
-      "acquired": "14 SEP 2026",
-      "confidence": 99.1,
-      "mode": "Visual Q&A",
-      "status": "Completed"
-    }
-  ]
+  "archive": []
 }

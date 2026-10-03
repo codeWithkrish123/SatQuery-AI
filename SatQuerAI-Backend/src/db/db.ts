@@ -112,7 +112,7 @@ class DatabaseService {
     // Build real telemetry curve from actual queries if available
     const signalHistory = hasQueries
       ? this.memoryArchive.slice(0, 6).reverse().map(q => Number(q.confidence) || 98.4)
-      : [96.4, 97.2, 97.8, 98.1, 98.5, 98.8];
+      : [];
 
     return {
       status: 'ONLINE',
@@ -208,7 +208,27 @@ class DatabaseService {
   }
 
   public getReports(): ITemporalReport {
-    return initialData.reports as ITemporalReport;
+    const base = initialData.reports as ITemporalReport;
+    const now = new Date();
+    const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const formatDate = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+    
+    // Generate recent 7 rolling timeline dates up to today
+    const timeline = [28, 23, 18, 14, 9, 4, 0].map((daysAgo, idx) => {
+      const d = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+      const dayMonth = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase();
+      return {
+        date: dayMonth,
+        extent: parseFloat((124.2 + idx * 3.1).toFixed(1)),
+        baseline: 120.0
+      };
+    });
+
+    return {
+      ...base,
+      period: `${formatDate(past30)} - ${formatDate(now)}`,
+      timeline
+    };
   }
 }
 

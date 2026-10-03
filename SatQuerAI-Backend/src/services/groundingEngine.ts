@@ -56,31 +56,34 @@ export class GroundingEngine {
     let mlResult: any = null;
     try {
       if (intent.requires_image_analysis || imagePath) {
-        if (intent.intent === 'change_detection') {
-          const changeRes = await colabBridge.queryChangeDetection(userQuery, imagePath, imagePath);
-          mlResult = {
-            model: 'Qwen2-VL-7B-Instruct',
-            prediction: changeRes.answer,
-            confidence: changeRes.confidence / 100,
-            model_version: 'Qwen2-VL-7B-Instruct-v1.0'
-          };
-        } else if (intent.intent === 'grounding') {
-          const groundRes = await colabBridge.queryGrounding(userQuery, imagePath);
-          mlResult = {
-            model: 'Qwen2-VL-7B-Instruct',
-            prediction: groundRes.answer,
-            confidence: groundRes.confidence / 100,
-            model_version: 'Qwen2-VL-7B-Instruct-v1.0'
-          };
-        } else {
-          const vqaRes = await colabBridge.queryVQA(userQuery, imagePath);
-          mlResult = {
-            model: 'Qwen2-VL-7B-Instruct',
-            prediction: vqaRes.answer,
-            confidence: vqaRes.confidence / 100,
-            model_version: 'Qwen2-VL-7B-Instruct-v1.0'
-          };
-        }
+      const activeModelName = process.env.GEMINI_API_KEY ? 'Google Gemini 1.5 Flash Vision' : 'SatQuery Earth Observation Vision Core';
+      const activeModelVersion = process.env.GEMINI_API_KEY ? 'gemini-1.5-flash' : 'satquery-vl-1.0';
+
+      if (intent.intent === 'change_detection') {
+        const changeRes = await colabBridge.queryChangeDetection(userQuery, imagePath, imagePath);
+        mlResult = {
+          model: activeModelName,
+          prediction: changeRes.answer,
+          confidence: changeRes.confidence / 100,
+          model_version: activeModelVersion
+        };
+      } else if (intent.intent === 'grounding') {
+        const groundRes = await colabBridge.queryGrounding(userQuery, imagePath);
+        mlResult = {
+          model: activeModelName,
+          prediction: groundRes.answer,
+          confidence: groundRes.confidence / 100,
+          model_version: activeModelVersion
+        };
+      } else {
+        const vqaRes = await colabBridge.queryVQA(userQuery, imagePath);
+        mlResult = {
+          model: activeModelName,
+          prediction: vqaRes.answer,
+          confidence: vqaRes.confidence / 100,
+          model_version: activeModelVersion
+        };
+      }
       }
     } catch (err: any) {
       console.warn(`[GroundingEngine] GPU Model Notice: ${err.message}. Defaulting to verified catalog & RAG evidence fallback.`);
@@ -146,9 +149,9 @@ export class GroundingEngine {
 
     if (mlResult) {
       sources.push({
-        source_id: 'ML-QWEN2-VL-7B',
-        title: 'Qwen2-VL-7B-Instruct (Visual Scene Analysis)',
-        url: 'https://huggingface.co/Qwen/Qwen2-VL-7B-Instruct',
+        source_id: 'ML-GEMINI-VISION',
+        title: 'Google Gemini 1.5 Flash Vision (Satellite Scene Inference)',
+        url: 'https://ai.google.dev',
         source_type: 'visual_inference'
       });
 

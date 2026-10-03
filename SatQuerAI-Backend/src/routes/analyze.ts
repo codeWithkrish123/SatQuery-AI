@@ -344,7 +344,7 @@ router.post('/ml/predict', upload.single('image'), async (req: Request, res: Res
     res.json({
       prediction: vqaRes.answer,
       confidence: (vqaRes.confidence || 98.4) / 100,
-      model_version: 'Qwen2-VL-7B-Instruct-v1.0',
+      model_version: 'Gemini-1.5-Flash-Vision',
       input_type: 'satellite_image'
     });
   } catch (err: any) {

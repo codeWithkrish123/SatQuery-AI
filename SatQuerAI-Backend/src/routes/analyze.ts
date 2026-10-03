@@ -239,9 +239,10 @@ router.post('/grounding', upload.single('image'), async (req: Request, res: Resp
   try {
     const groundRes = await colabBridge.queryGrounding(feature, filePath);
     
+    const bboxPercent = groundRes.bounding_box && groundRes.bounding_box.length === 4 ? groundRes.bounding_box : null;
     res.json({
       raw_response: groundRes.answer,
-      bbox_percent: null,
+      bbox_percent: bboxPercent,
       live_model: groundRes.live_model,
       bounding_box: groundRes.bounding_box
     });

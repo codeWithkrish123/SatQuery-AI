@@ -1,3 +1,3 @@
-import app from './SatQuerAI-Backend/src/index';
+import app from '../SatQuerAI-Backend/src/index';
 
 export default app;

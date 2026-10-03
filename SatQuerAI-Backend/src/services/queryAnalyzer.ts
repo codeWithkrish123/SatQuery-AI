@@ -45,7 +45,7 @@ export class QueryAnalyzer {
       topic: userQuery.trim(),
       location,
       satellite,
-      requires_image_analysis: hasImage || intent === 'change_detection' || intent === 'grounding',
+      requires_image_analysis: hasImage || intent === 'change_detection' || intent === 'grounding' || intent === 'scene_analysis',
       requires_external_data: intent === 'satellite_information' || intent === 'scene_analysis'
     };
   }

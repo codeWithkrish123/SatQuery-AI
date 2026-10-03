@@ -89,14 +89,16 @@ class DatabaseService {
 
   public getSystemStatus(): ISystemStatus {
     const modelUrl = process.env.COLAB_MODEL_URL?.trim();
-    const isModelConfigured = !!modelUrl;
+    const geminiKey = process.env.GEMINI_API_KEY?.trim();
+    const isModelConfigured = !!modelUrl || !!geminiKey;
+    const modelLabel = geminiKey ? 'GEMINI 1.5 FLASH ONLINE' : (modelUrl ? 'LIVE GPU ONLINE' : 'ONLINE');
     return {
       status: 'ONLINE',
       node: 'A7 · ISRO Observation Node',
       activeSatellites: 12,
       coveragePercentage: 78,
       evidenceCoverage: 98.4,
-      medianResponse: isModelConfigured ? '2.1s' : '4.6s',
+      medianResponse: isModelConfigured ? '1.8s' : '4.6s',
       lastSync: new Date().toISOString().substring(11, 19) + ' UTC',
       totalScenes: this.memoryScenes.length,
       totalQueries: this.memoryArchive.length,
@@ -106,7 +108,7 @@ class DatabaseService {
         { id: '3', title: 'Low-light scene processed', subtitle: `${this.memoryScenes[2]?.name || 'Kutch Corridor'} · ${this.memoryScenes[2]?.id || 'SCN-0889'}`, tone: 'slate', timeAgo: '43m' }
       ],
       nodeHealth: {
-        visionModel: isModelConfigured ? 'LIVE GPU ONLINE' : 'ONLINE',
+        visionModel: isModelConfigured ? modelLabel : 'ONLINE',
         retrievalIndex: 'SYNCED',
         groundingEngine: 'ONLINE',
         colabBridgeConfigured: isModelConfigured

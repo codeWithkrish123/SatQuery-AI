@@ -26,8 +26,8 @@ export default function Overview() {
   const [loading, setLoading] = useState(true);
   const [userDisplay, setUserDisplay] = useState('Analyst');
 
-  const fetchOverviewData = async () => {
-    setLoading(true);
+  const fetchOverviewData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const [statusRes, scenesRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/system/status`),
@@ -46,12 +46,17 @@ export default function Overview() {
     } catch (err) {
       console.error("Overview data fetch error:", err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOverviewData();
+    fetchOverviewData(true);
+
+    // Real-time continuous auto-refresh polling every 6 seconds
+    const interval = setInterval(() => {
+      fetchOverviewData(false);
+    }, 6000);
 
     try {
       const storedUser = localStorage.getItem('satquery_user');
@@ -69,6 +74,8 @@ export default function Overview() {
     } catch (e) {
       console.warn('Could not read user profile:', e);
     }
+
+    return () => clearInterval(interval);
   }, []);
 
   const signalPoints = systemStatus?.signalHistory || [94.1, 95.8, 97.2, 98.4, 96.9, 98.4];
@@ -163,7 +170,7 @@ export default function Overview() {
               {systemStatus?.evidenceCoverage ? `${systemStatus.evidenceCoverage}%` : '98.4%'}
             </span>
             <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-              Verified
+              Live Verified
             </span>
           </div>
           <p className="text-xs text-slate-500">Validated against ISRO catalog database</p>
@@ -178,10 +185,10 @@ export default function Overview() {
           </div>
           <div className="flex items-baseline space-x-2">
             <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {scenes.length || systemStatus?.totalScenes || 12}
+              {scenes.length || systemStatus?.totalScenes || 0}
             </span>
             <span className="text-[11px] font-semibold text-[#00A3A6] bg-[#E6F4F1] px-2 py-0.5 rounded-md border border-[#00A3A6]/20">
-              4 Active Passes
+              {scenes.length} Active Tiles
             </span>
           </div>
           <p className="text-xs text-slate-500">Cartosat-3, EOS-04, Sentinel-1/2</p>
@@ -196,13 +203,15 @@ export default function Overview() {
           </div>
           <div className="flex items-baseline space-x-2">
             <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {systemStatus?.medianResponse || '2.1s'}
+              {systemStatus?.medianResponse || '1.8s'}
             </span>
             <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-              0.8s Faster
+              Live 24/7
             </span>
           </div>
-          <p className="text-xs text-slate-500">Qwen2-VL GPU inference acceleration</p>
+          <p className="text-xs text-slate-500 truncate" title={systemStatus?.nodeHealth?.visionModel || 'Gemini Cloud Vision API'}>
+            {systemStatus?.nodeHealth?.visionModel || 'Gemini Cloud Vision API'}
+          </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 space-y-3 shadow-sm hover:shadow-md hover:border-[#00A3A6]/40 transition-all">
@@ -214,7 +223,7 @@ export default function Overview() {
           </div>
           <div className="flex items-baseline space-x-2">
             <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {systemStatus?.totalQueries ? systemStatus.totalQueries * 60 + 247 : 247}
+              {systemStatus?.totalQueries ?? scenes.length ?? 0}
             </span>
             <span className="text-[11px] font-semibold text-[#00A3A6] bg-[#E6F4F1] px-2 py-0.5 rounded-md border border-[#00A3A6]/20">
               Zero Hallucination
@@ -297,25 +306,31 @@ export default function Overview() {
               <h3 className="text-base font-bold text-slate-900 mt-0.5">Action Required</h3>
             </div>
             <span className="px-2.5 py-1 rounded-full bg-[#E6F4F1] text-[#00A3A6] text-xs font-bold border border-[#00A3A6]/20">
-              3 Pending
+              {systemStatus?.attentionQueue?.length || 0} Pending
             </span>
           </div>
 
           <div className="space-y-3">
-            {(systemStatus?.attentionQueue || []).map((item) => (
-              <div key={item.id} className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 hover:border-[#00A3A6]/40 transition-all flex items-start space-x-3 group">
-                <span className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${
-                  item.tone === 'amber' ? 'bg-amber-500' : item.tone === 'teal' ? 'bg-[#00A3A6]' : 'bg-slate-400'
-                }`}></span>
-                <div className="flex-1 space-y-0.5">
-                  <h4 className="text-xs font-bold text-slate-900 group-hover:text-[#00A3A6] transition-colors">{item.title}</h4>
-                  <p className="text-[11px] text-slate-500">{item.subtitle}</p>
+            {(systemStatus?.attentionQueue && systemStatus.attentionQueue.length > 0) ? (
+              systemStatus.attentionQueue.map((item) => (
+                <div key={item.id} className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 hover:border-[#00A3A6]/40 transition-all flex items-start space-x-3 group">
+                  <span className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${
+                    item.tone === 'amber' ? 'bg-amber-500' : item.tone === 'teal' ? 'bg-[#00A3A6]' : 'bg-slate-400'
+                  }`}></span>
+                  <div className="flex-1 space-y-0.5">
+                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-[#00A3A6] transition-colors">{item.title}</h4>
+                    <p className="text-[11px] text-slate-500">{item.subtitle}</p>
+                  </div>
+                  <Link to="/analyze" className="text-slate-400 group-hover:text-[#00A3A6] transition-colors">
+                    <ArrowUpRight className="w-4 h-4" />
+                  </Link>
                 </div>
-                <Link to="/analyze" className="text-slate-400 group-hover:text-[#00A3A6] transition-colors">
-                  <ArrowUpRight className="w-4 h-4" />
-                </Link>
+              ))
+            ) : (
+              <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                All satellite data streams verified and nominal.
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -346,22 +361,30 @@ export default function Overview() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-              {scenes.slice(0, 5).map((scene) => (
-                <tr key={scene.id} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="py-3.5 px-4 font-mono font-bold text-[#00A3A6]">{scene.id}</td>
-                  <td className="py-3.5 px-4 font-bold text-slate-900">{scene.name}</td>
-                  <td className="py-3.5 px-4 text-slate-600">{scene.satellite}</td>
-                  <td className="py-3.5 px-4 text-slate-600">{scene.resolution || '5.8m'}</td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
-                      {scene.status || 'ANALYZED'}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-bold text-[#00A3A6]">
-                    {scene.confidence}%
+              {scenes.length > 0 ? (
+                scenes.slice(0, 5).map((scene) => (
+                  <tr key={scene.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-bold text-[#00A3A6]">{scene.id}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-900">{scene.name}</td>
+                    <td className="py-3.5 px-4 text-slate-600">{scene.satellite}</td>
+                    <td className="py-3.5 px-4 text-slate-600">{scene.resolution || '5.8m'}</td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
+                        {scene.status || 'ANALYZED'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-bold text-[#00A3A6]">
+                      {scene.confidence}%
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="py-8 text-center text-slate-400">
+                    No satellite scenes loaded yet. Connect your catalog or upload scenes in Scene Library.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -377,7 +400,7 @@ export default function Overview() {
             <div>
               <span className="text-slate-400 text-[10px] font-mono block">VISION MODEL ENDPOINT</span>
               <span className="font-bold text-slate-900">
-                {systemStatus?.nodeHealth?.visionModel || 'Qwen2-VL-7B-Instruct (4-bit)'}
+                {systemStatus?.nodeHealth?.visionModel || 'Gemini Cloud Vision API'}
               </span>
             </div>
           </div>

@@ -105,31 +105,37 @@ export default function Scenes() {
       </div>
 
       {/* Scene Grid Matching Screenshot 1 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-mono">
-        {scenes.map((scene) => (
-          <div key={scene.id} className="glass-card overflow-hidden">
-            {/* Asset Code & Green Dot */}
-            <div className="p-3.5 border-b border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-[#00A3A6] text-[11px] font-semibold">{scene.id}</span>
-              <span className="w-2 h-2 rounded-full bg-[#00A3A6]"></span>
-            </div>
+      {scenes.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-mono">
+          {scenes.map((scene) => (
+            <div key={scene.id} className="glass-card overflow-hidden">
+              {/* Asset Code & Green Dot */}
+              <div className="p-3.5 border-b border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-[#00A3A6] text-[11px] font-semibold">{scene.id}</span>
+                <span className="w-2 h-2 rounded-full bg-[#00A3A6]"></span>
+              </div>
 
-            {/* Image Preview */}
-            <div className="h-44 overflow-hidden relative bg-slate-100">
-              <img src={scene.thumbnail} alt={scene.name} className="w-full h-full object-cover" />
-            </div>
+              {/* Image Preview */}
+              <div className="h-44 overflow-hidden relative bg-slate-100">
+                <img src={scene.thumbnail} alt={scene.name} className="w-full h-full object-cover" />
+              </div>
 
-            {/* Title & Date */}
-            <div className="p-4 space-y-2">
-              <h3 className="text-sm font-bold text-slate-900 font-sans">{scene.name}</h3>
-              <p className="text-[11px] text-slate-400">{scene.acquired}</p>
-              <div className="text-[11px] text-[#00A3A6] font-bold pt-1">
-                CONFIDENCE {scene.confidence}%
+              {/* Title & Date */}
+              <div className="p-4 space-y-2">
+                <h3 className="text-sm font-bold text-slate-900 font-sans">{scene.name}</h3>
+                <p className="text-[11px] text-slate-400">{scene.acquired}</p>
+                <div className="text-[11px] text-[#00A3A6] font-bold pt-1">
+                  CONFIDENCE {scene.confidence}%
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="glass-panel p-12 text-center text-slate-400 text-xs font-mono">
+          No satellite imagery scenes matching current filter. Upload a scene or select 'All'.
+        </div>
+      )}
 
       {/* Upload Modal */}
       {showUploadModal && (
